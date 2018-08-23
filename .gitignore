@@ -1,39 +1,5 @@
-# Specific files
-**/io.sarl.examples.plugin/about.mappings
-**/io.sarl.eclipse/about.mappings
-**/io.sarl.lang.core/about.mappings
-**/io.sarl.lang.ui/about.mappings
-**/io.janusproject.eclipse/about.mappings
-**/io.janusproject.plugin/about.mappings
-**/io.sarl.experienceindex.plugin/about.mappings
-**/io.sarl.lang.updatesite/io.sarl.lang.product.copy
-
 # Xtext generated files
-**/io.sarl.core/xtend-gen/
-**/io.sarl.core/src-gen/
-**/io.sarl.core/src/main/generated-sources/
-**/io.sarl.util/xtend-gen/
-**/io.sarl.util/src-gen/
-**/io.sarl.util/src/main/generated-sources/
-**/io.sarl.lang.ui/xtend-gen/
-**/io.sarl.lang.ui/src/main/xtend-gen/
-**/io.sarl.lang.ui/src/main/generated-sources/
-**/io.sarl.lang.ui/src/test/xtend-gen/
-**/io.sarl.lang.ui/src/test/generated-sources/
-**/io.sarl.lang/xtend-gen/
-**/io.sarl.lang/src/main/xtend-gen/
-**/io.sarl.lang/src/main/generated-sources/
-**/io.sarl.lang/src/test/xtend-gen/
-**/io.sarl.lang/src/test/generated-sources/
-**/io.sarl.lang/model/generated/
-**/io.sarl.lang.tests/xtend-gen/
-**/io.sarl.lang.tests/src/main/xtend-gen/
-**/io.sarl.lang.tests/src/main/generated-sources/
-**/io.sarl.lang.tests/src/test/xtend-gen/
-**/io.sarl.lang.tests/src/test/generated-sources/
-**/io.sarl.experienceindex.plugin/xtend-gen/
-**/io.sarl.experienceindex.plugin/src-gen/
-**/io.sarl.experienceindex.plugin/src/main/generated-sources/
+**/src/main/generated-sources/
 
 # Xtext templates
 **/*.xml_gen
@@ -48,11 +14,6 @@ bin/
 **/.classpath
 **/.settings
 **/.metadata
-
-#Specific cases of SARL Samples projects
-!**/io.sarl.examples.plugin/projects/**/.project
-!**/io.sarl.examples.plugin/projects/**/.classpath
-
 
 # Subversion and CVS
 **/.svn/
