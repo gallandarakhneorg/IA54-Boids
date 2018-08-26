@@ -1,0 +1,230 @@
+/*
+ * $Id$
+ *
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ *
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.sarl.demos.boids.agents
+
+import io.sarl.core.Behaviors
+import io.sarl.core.DefaultContextInteractions
+import io.sarl.core.Initialize
+import io.sarl.core.InnerContextAccess
+import io.sarl.core.Lifecycle
+import io.sarl.core.Logging
+import io.sarl.demos.boids.body.BoidBody
+import io.sarl.demos.boids.body.EnvInfos
+import io.sarl.demos.boids.events.BoidInitialized
+import io.sarl.demos.boids.events.BoidsReady
+import io.sarl.demos.boids.events.BoidsSideReady
+import io.sarl.demos.boids.events.Cycle
+import io.sarl.demos.boids.events.EndSimulation
+import io.sarl.demos.boids.events.MotionDecision
+import io.sarl.demos.boids.events.MotionQuery
+import io.sarl.demos.boids.events.PositionChange
+import io.sarl.demos.boids.events.StartPositionQuery
+import io.sarl.demos.boids.events.StartingSimulation
+import io.sarl.demos.boids.events.ValidationDeplacement
+import io.sarl.demos.boids.gui.BoidsFxViewerController
+import io.sarl.lang.core.Address
+import java.util.Map
+import java.util.UUID
+import java.util.concurrent.locks.ReentrantLock
+import org.arakhne.afc.math.geometry.d2.d.Point2d
+
+/** 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+@SuppressWarnings("potential_field_synchronization_problem", "discouraged_occurrence_readonly_use")
+agent Environment {
+	uses Logging, DefaultContextInteractions, Lifecycle, InnerContextAccess, Behaviors
+	
+	/** Mapping from agent id to body. */
+	var boidsList : Map<UUID,BoidBody>	
+	/** Mapping from body positions to agent identifiers. */
+	var boidsGrid : Map<Point2d, UUID>
+	/** Map from agent id to the communication address. */
+	var boidsAddresses : Map<UUID, Address>
+	/** Number of boids that were updated. */
+	var boidsUpdated : int
+	val boidsUpdatedLock = new ReentrantLock
+	/** Graphic controller. */
+	var ctrl : BoidsFxViewerController
+	/** is the init step of the boids' positions. */
+	var firstTime : boolean
+	/** ID of the parent */
+	var spawner : UUID
+	/** Is inside a update cycle. */
+	var inCycle : Boolean
+	/** Environment info. */
+	var envInfos : EnvInfos
+	/** Is the simulation just stopped. */
+	var restart : boolean = false
+
+	on Initialize {
+		loggingName = "Environment-" + this.ID
+		this.ctrl = occurrence.parameters.get(0) as BoidsFxViewerController
+		this.boidsUpdated = 0
+		this.boidsList = <UUID, BoidBody>newHashMap
+		this.firstTime = true
+		this.spawner = occurrence.spawner
+		this.inCycle = false
+		this.envInfos = new EnvInfos(this.ctrl.mapWidth, this.ctrl.mapHeight)
+	}
+	
+	
+	on StartingSimulation {
+		this.boidsGrid = newHashMap
+		this.boidsList = newHashMap
+		this.boidsAddresses = newHashMap
+		
+		for (var i = 0; i < this.ctrl.boidsPopulation; i++) {
+			for (var j = 0 ; j < this.ctrl.boidsQuantity; j++){
+				spawnInContext(typeof(Boid), innerContext, i + 1, ctrl.boidsSettings.get(i).speed, ctrl.boidsSettings.get(i).mass, ctrl.boidsSettings.get(i).angle, ctrl.boidsSettings.get(i).distance, envInfos)
+			}
+		}
+	}
+
+	on BoidInitialized [occurrence.isInInnerDefaultSpace] {
+		if (occurrence.type == "Boid") {
+			this.boidsAddresses.put(occurrence.source.UUID, occurrence.source)
+			this.boidsList.put(occurrence.source.UUID, occurrence.body)
+			innerContext.defaultSpace.emit(ID, new StartPositionQuery(this.ctrl.obstacles)) [it == occurrence.source]
+		}
+	}
+
+	on BoidsSideReady {
+		emit(new BoidsReady)
+	}
+
+	on PositionChange [!isFromMe] {
+		restart = true
+		this.boidsList.get(occurrence.boid).position.x = occurrence.x
+		this.boidsList.get(occurrence.boid).position.y = occurrence.y
+	}
+
+	on MotionDecision {
+		
+		var accept = false
+		
+		val fixedposition = occurrence.position.validatePosition
+		
+		synchronized (boidsGrid) {
+		
+			// on regarde si la position est libre 
+			if (!this.boidsGrid.containsKey(fixedposition)) {
+				this.boidsGrid.put(fixedposition, occurrence.source.UUID)
+				accept = true
+			}
+		}
+		
+			
+		if (accept) {
+			innerContext.defaultSpace.emit(ID, new ValidationDeplacement(fixedposition))[it == occurrence.source]	
+		} else {
+			if (this.firstTime == true) {
+				innerContext.defaultSpace.emit(ID, new StartPositionQuery(this.ctrl.obstacles)) [it==occurrence.source]
+			}else{
+				innerContext.defaultSpace.emit(ID, new MotionQuery(this.boidsList, this.ctrl.obstacles)) [it==occurrence.source]
+			}
+		}
+
+		this.boidsUpdatedLock.lock
+		try {
+			if (accept){
+				boidsUpdated = boidsUpdated + 1
+			}
+			if(this.boidsUpdated == this.ctrl.boidsQuantity * this.ctrl.boidsPopulation && this.firstTime == true) {
+				wake(new BoidsSideReady)
+				this.firstTime = false
+			}
+		} finally {
+			boidsUpdatedLock.unlock
+		}
+	}
+
+	on Cycle {
+		if(!inCycle) {
+			if (!restart) {
+				boidsUpdatedLock.lock
+				try {
+					 if(this.boidsUpdated == boidsList.size){	//si le nombre de boids ayant update leur coordonnées est égal au nombre de boids vivants, on peut envoyer au Scheduler
+						inCycle = true
+						// envoi des nouveaux corps des boids
+						ctrl.updateGraphics(this.boidsList.values)
+		
+						// remise à zéro de la liste des changements
+						synchronized (boidsGrid){
+							this.boidsGrid = newHashMap
+						}
+						
+						//On se prépare pour la prochaine itération
+						this.boidsUpdated = 0
+						boidsAddresses.forEach[id, address|
+								innerContext.defaultSpace.emit(id, new MotionQuery(this.boidsList, this.ctrl.obstacles)) [it==address]
+						]
+						inCycle = false	
+					}	
+				} finally {
+					boidsUpdatedLock.unlock
+				}
+			} else {
+					restart = false
+					boidsUpdated = 0
+					boidsAddresses.forEach [ id, address |
+						innerContext.defaultSpace.emit(id, new MotionQuery(this.boidsList, this.ctrl.obstacles)) [it==address]
+					]
+			}
+		}
+	}
+
+
+	/**
+	 * Check if the given position is on the map, and clip the position on the map if it is outside.
+	 * @param v the position.
+	 * @return the correct position.
+	 */
+	def validatePosition(v : Point2d) : Point2d {
+		var positionX = v.x
+		var positionY = v.y
+
+		if (positionX < 0)
+			positionX = 0
+		if (positionX >= this.ctrl.mapWidth)
+			positionX = this.ctrl.mapWidth - 1
+		if (positionY < 0)
+			positionY = 0
+		if (positionY >= this.ctrl.mapHeight)
+			positionY = this.ctrl.mapHeight - 1 
+		
+		return new Point2d(positionX, positionY)
+	}
+
+	on EndSimulation [!hasMemberAgent] {
+		emit(new EndSimulation)
+		killMe
+	}
+
+	on EndSimulation [hasMemberAgent] {
+		innerContext.defaultSpace.emit(ID, new EndSimulation)
+	}
+
+}

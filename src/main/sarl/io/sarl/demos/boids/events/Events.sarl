@@ -1,0 +1,322 @@
+/*
+ * $Id$
+ *
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ *
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.sarl.demos.boids.events
+
+import io.sarl.demos.boids.agents.Boid
+import io.sarl.demos.boids.body.BoidBody
+import io.sarl.demos.boids.environment.Obstacle
+import java.util.Collection
+import java.util.List
+import java.util.Map
+import java.util.UUID
+import org.arakhne.afc.math.geometry.d2.d.Vector2d
+import org.arakhne.afc.math.geometry.d2.d.Point2d
+
+/**
+ * User parameters to give to BootAgent.
+ *
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event ConfigureSimulation {
+	val mapSelection : int
+	val boidsQuantity : int
+	val boidsPopulation : int
+
+	/** 
+	 * @param mapSelection Map index.
+	 * @param boidsQuantity Number of boids to create.
+	 * @param boidsPopulation Number of groups.
+	 */	
+	new(mS : int, bQ : int, bP : int) {
+		mapSelection = mS
+		boidsQuantity = bQ
+		boidsPopulation = bP
+	}
+}
+
+/** 
+ * A boids was initialized.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event BoidInitialized {
+	val body : BoidBody
+	val type : String
+
+	/** 
+	 * @param body the initialized body.
+	 * @param type : the type of the entity. 
+	 */
+	new(body : BoidBody, type : String) {
+		this.body = body
+		this.type = type
+	}
+}
+
+/**
+ * Run the boid behavior.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+event RunBoidBehavior
+
+/** Query a boids to decide a motion.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event MotionQuery {
+	val boids : Map<UUID, BoidBody>
+	val obstacles : List<Obstacle>
+
+	/** 
+	 * @param boids list of the boids around.
+	 * @param obstacles list of the obstacles around.
+	 */
+	new (boids : Map<UUID, BoidBody>, obstacles : List<Obstacle>) {
+		this.boids = boids
+		this.obstacles = obstacles
+	}
+}
+
+/**
+ * Decision of motion from a boid.
+ *
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+event MotionDecision {
+	val position = new Point2d
+	val newSpeed = new Vector2d
+
+	/** 
+	 * @param position the new position of the boid.
+	 * @param speed the expected further speed of the boid.
+	 */
+	new (pos : Point2d, speed : Vector2d) {
+		assert pos !== null
+		assert speed !== null
+		this.position.set(pos)
+		this.newSpeed.set(speed)
+	}
+
+}
+
+/**
+ * Validation of a boid motion.
+ *
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event ValidationDeplacement{
+	val position = new Point2d
+
+	/** 
+	 * @param position the position of the boid after it was validated by the environment.
+	 */	
+	new (position : Point2d) {
+		assert position !== null
+		this.position.set(position)
+	}
+}
+
+/**
+ * Start the simulation
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event StartingSimulation
+
+/** 
+ * End of the simulation.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event EndSimulation
+
+
+/**
+ * Query for computing the initial position of boids.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event StartPositionQuery {
+	val obstacles : List<Obstacle>
+
+	/** 
+	 * @param obstacles list of the obstacles.
+	 */
+	new (obstacles : List<Obstacle>) {
+		this.obstacles = obstacles
+	}
+}
+
+/**
+ * Data about boids.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event AllBoidsData {
+	val boids : Collection<Boid>
+
+	/** 
+	 * @parameter boids
+	 */	
+	new(boids : Collection<Boid>){
+		this.boids = boids
+	}
+}
+
+/**
+ * Query for boid body initialization.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event InitBoidBody {
+	val body : BoidBody
+
+	/** 
+	 * @parameter body
+	 */	
+	new (body : BoidBody) {
+		this.body = body
+	}
+}
+
+/**
+ * The body is initialized. 
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event BoidBodyInitialized
+
+/** 
+ * All boids are ready for the simulation.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event BoidsReady
+
+/**
+ * A new step within the simulation cycle should start.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event TimeManagingStart {
+	val frequency : long
+
+	/** 
+	 * @param frequency the refresh rate.
+	 */	
+	new (frequency : long) {
+		this.frequency = frequency
+	}
+}
+
+/**
+ * All boids are ready. 
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event BoidsSideReady
+
+/**
+ * Start of a new simulation cycle.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event Cycle
+
+/**
+ * Simulation pause.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event Pause
+
+/**
+ * Simulation restart
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event Resume
+
+/**
+ * The position of a boids has changed due to drag &amp; drop.
+ * 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ */
+event PositionChange {
+	val boid : UUID
+	val x : double
+	val y : double
+
+	/** 
+	 * @param boid the moving boid.
+	 * @param x the new position.
+	 * @param y the new position.
+	 */	
+	new (boid : UUID, x : double, y : double) {
+		assert boid !== null
+		this.boid = boid
+		this.x = x
+		this.y = y
+	}
+
+}

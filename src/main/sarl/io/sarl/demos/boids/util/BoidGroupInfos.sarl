@@ -1,0 +1,68 @@
+/* 
+ * $Id$
+ * 
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ * 
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.sarl.demos.boids.util
+
+import org.eclipse.xtend.lib.annotations.Accessors
+
+/** 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+class BoidGroupInfos implements Cloneable {
+
+	/** Mass of the boids' family.
+	 */
+	@Accessors
+	var mass : int
+
+	/** Speed of the boids' family.
+	 */
+	@Accessors
+	var speed : int
+
+	/** Perception angle of the boids' family.
+	 */
+	@Accessors
+	var angle : int
+
+	/** Perception distance of the boids' family.
+	 */
+	@Accessors
+	var distance : int
+
+	/** 
+	 * Constructor.
+	 *
+	 * @param mass the mass of the family.
+	 * @param speed the speed of the family.
+	 * @param angle the perception angle of the family.
+	 * @param distance the perception distance of the family.
+	 */
+	new (mass : int, speed : int, angle : int, distance : int) {
+		this.mass = mass
+		this.speed = speed
+		this.angle = angle
+		this.distance = distance
+	}
+
+}

@@ -1,0 +1,1794 @@
+/*
+ * $Id$
+ *
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ *
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.sarl.demos.boids.gui
+
+import io.sarl.demos.boids.Configuration
+import io.sarl.demos.boids.agents.BootAgent
+import io.sarl.demos.boids.body.BoidBody
+import io.sarl.demos.boids.environment.Obstacle
+import io.sarl.demos.boids.events.ConfigureSimulation
+import io.sarl.demos.boids.events.Pause
+import io.sarl.demos.boids.events.PositionChange
+import io.sarl.demos.boids.events.Resume
+import io.sarl.demos.boids.util.BoidGroupInfos
+import io.sarl.javafx.FxViewerController
+import java.util.ArrayList
+import java.util.Collection
+import java.util.List
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import javafx.application.Platform
+import javafx.fxml.FXML
+import javafx.geometry.Insets
+import javafx.scene.Group
+import javafx.scene.control.Button
+import javafx.scene.control.Label
+import javafx.scene.control.ScrollBar
+import javafx.scene.control.ScrollPane
+import javafx.scene.control.TextField
+import javafx.scene.control.ToggleButton
+import javafx.scene.effect.Glow
+import javafx.scene.image.ImageView
+import javafx.scene.input.KeyEvent
+import javafx.scene.input.MouseEvent
+import javafx.scene.layout.AnchorPane
+import javafx.scene.layout.Background
+import javafx.scene.layout.BackgroundFill
+import javafx.scene.layout.CornerRadii
+import javafx.scene.layout.Pane
+import javafx.scene.shape.Arc
+import javafx.scene.shape.ArcType
+import javafx.scene.shape.Circle
+import javafx.scene.shape.Line
+import javafx.scene.shape.Polygon
+import javafx.scene.shape.Rectangle
+
+import static extension javafx.scene.paint.Color.*
+
+/** 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+@SuppressWarnings("unused_private_member")
+class BoidsFxViewerController extends FxViewerController {
+
+	/** Simulation state.
+	 */
+	var launched = false
+
+	/** Selected map.
+	 */
+	var selectedMap = 1
+	
+	/** Boids groups' settings.
+	 */
+	var boidsSettings = <BoidGroupInfos>newArrayList
+
+	/** Polygons on the map.
+	 */
+	var polygons : List<Polygon>
+
+	/** Obstacles on the map.
+	 */
+	var obstacles = <Obstacle>newArrayList
+
+	/** Night mode.
+	 */
+	var nightMode = true
+
+	/** Perception activation.
+	 */
+	var togglePerception = true
+
+	/** Boid that is targeted by the user.
+	 */
+	var currentBoid : UUID
+	
+	/** Polygon that is targeted by the user.
+	 */
+	var currentPolygon : Polygon
+
+	var orgSceneX : double
+	var orgSceneY : double
+	var orgTranslateX : double
+	var orgTranslateY : double
+	var savedPosition = <Double>newArrayList
+
+	var perceptions = <BoidBody, Arc>newHashMap
+
+	@FXML var main_pane : Pane
+	@FXML var boids_group : Group
+	@FXML var obstacle_group : Group
+	@FXML var perception_group : Group
+	@FXML var start_button : Button
+	@FXML var pause_button : Rectangle
+	@FXML var resume_button : Polygon
+	@FXML var toggle_night_mode : ToggleButton
+	@FXML var night_mode_indicator : Circle
+	@FXML var toggle_perception : ToggleButton
+	@FXML var perception_indicator : Circle
+	@FXML var UI_pane: Pane
+	@FXML var boids_quantity_label : Label
+	@FXML var boids_population_label : Label
+	@FXML var boids_quantity_input : TextField
+	@FXML var boids_population_input : TextField
+	@FXML var simulation_parameters_pane : Pane
+	@FXML var settings_label : Label
+	@FXML var see_advanced_settings_label : Label
+	@FXML var boids_population_line : Line
+	@FXML var increment_boids_population : Label
+	@FXML var decrement_boids_population : Label
+	@FXML var boids_population_increment_circle : Circle
+	@FXML var boids_population_decrement_circle : Circle
+	@FXML var boids_quantity_line : Line
+	@FXML var increment_boids_quantity : Label
+	@FXML var decrement_boids_quantity : Label
+	@FXML var boids_quantity_increment_circle : Circle
+	@FXML var boids_quantity_decrement_circle : Circle
+	@FXML var map_selection_pane : ScrollPane
+	@FXML var map_selection_label : Label
+	@FXML var preview_map_1 : ImageView
+	@FXML var preview_map_2 : ImageView
+	@FXML var preview_map_3 : ImageView
+	@FXML var preview_map_4 : ImageView
+	@FXML var preview_map_1_border : Rectangle
+	@FXML var preview_map_2_border : Rectangle
+	@FXML var preview_map_3_border : Rectangle
+	@FXML var preview_map_4_border : Rectangle
+	@FXML var map_label_1 : Label
+	@FXML var map_label_2 : Label
+	@FXML var map_label_3 : Label
+	@FXML var map_label_4 : Label
+	@FXML var tick_map_1 : ImageView
+	@FXML var tick_map_2 : ImageView
+	@FXML var tick_map_3 : ImageView
+	@FXML var tick_map_4 : ImageView
+	@FXML var advanced_settings_pane : ScrollPane
+	@FXML var advanced_settings_anchor_pane : AnchorPane
+	@FXML var pane_group_1 : Pane
+	@FXML var pane_group_2 : Pane
+	@FXML var pane_group_3 : Pane
+	@FXML var pane_group_4 : Pane
+	@FXML var pane_group_5 : Pane
+	@FXML var pane_group_6 : Pane
+	@FXML var pane_group_7 : Pane
+	@FXML var pane_group_8 : Pane
+	@FXML var advanced_settings_label : Label
+	@FXML var reset_group_values : Label
+	@FXML var group_label_1 : Label
+	@FXML var group_label_2 : Label
+	@FXML var group_label_3 : Label
+	@FXML var group_label_4 : Label
+	@FXML var group_label_5 : Label
+	@FXML var group_label_6 : Label
+	@FXML var group_label_7 : Label
+	@FXML var group_label_8 : Label
+	@FXML var mass_label_1 : Label 
+	@FXML var mass_1 : ScrollBar
+	@FXML var mass_min_1 : Label
+	@FXML var mass_max_1 : Label
+	@FXML var mass_display_1 : Label
+	@FXML var mass_label_2 : Label
+	@FXML var mass_2 : ScrollBar
+	@FXML var mass_min_2 : Label
+	@FXML var mass_max_2 : Label
+	@FXML var mass_display_2 : Label
+	@FXML var mass_label_3 : Label
+	@FXML var mass_3 : ScrollBar
+	@FXML var mass_min_3 : Label
+	@FXML var mass_max_3 : Label
+	@FXML var mass_display_3 : Label
+	@FXML var mass_label_4 : Label
+	@FXML var mass_4 : ScrollBar
+	@FXML var mass_min_4 : Label
+	@FXML var mass_max_4 : Label
+	@FXML var mass_display_4 : Label
+	@FXML var mass_label_5 : Label
+	@FXML var mass_5 : ScrollBar
+	@FXML var mass_min_5 : Label
+	@FXML var mass_max_5 : Label
+	@FXML var mass_display_5 : Label
+	@FXML var mass_label_6 : Label
+	@FXML var mass_6 : ScrollBar
+	@FXML var mass_min_6 : Label
+	@FXML var mass_max_6 : Label
+	@FXML var mass_display_6 : Label
+	@FXML var mass_label_7 : Label
+	@FXML var mass_7 : ScrollBar
+	@FXML var mass_min_7 : Label
+	@FXML var mass_max_7 : Label
+	@FXML var mass_display_7 : Label
+	@FXML var mass_label_8 : Label
+	@FXML var mass_8 : ScrollBar
+	@FXML var mass_min_8 : Label
+	@FXML var mass_max_8 : Label
+	@FXML var mass_display_8 : Label
+	@FXML var speed_label_1 : Label
+	@FXML var speed_1 : ScrollBar
+	@FXML var speed_min_1 : Label
+	@FXML var speed_max_1 : Label
+	@FXML var speed_display_1 : Label
+	@FXML var speed_label_2 : Label
+	@FXML var speed_2 : ScrollBar
+	@FXML var speed_min_2 : Label
+	@FXML var speed_max_2 : Label
+	@FXML var speed_display_2 : Label
+	@FXML var speed_label_3 : Label
+	@FXML var speed_3 : ScrollBar
+	@FXML var speed_min_3 : Label
+	@FXML var speed_max_3 : Label
+	@FXML var speed_display_3 : Label
+	@FXML var speed_label_4 : Label
+	@FXML var speed_4 : ScrollBar
+	@FXML var speed_min_4 : Label
+	@FXML var speed_max_4 : Label
+	@FXML var speed_display_4 : Label
+	@FXML var speed_label_5 : Label
+	@FXML var speed_5 : ScrollBar
+	@FXML var speed_min_5 : Label
+	@FXML var speed_max_5 : Label
+	@FXML var speed_display_5 : Label
+	@FXML var speed_label_6 : Label
+	@FXML var speed_6 : ScrollBar
+	@FXML var speed_min_6 : Label
+	@FXML var speed_max_6 : Label
+	@FXML var speed_display_6 : Label
+	@FXML var speed_label_7 : Label
+	@FXML var speed_7 : ScrollBar
+	@FXML var speed_min_7 : Label
+	@FXML var speed_max_7 : Label
+	@FXML var speed_display_7 : Label
+	@FXML var speed_label_8 : Label
+	@FXML var speed_8 : ScrollBar
+	@FXML var speed_min_8 : Label
+	@FXML var speed_max_8 : Label
+	@FXML var speed_display_8 : Label
+	@FXML var angle_label_1 : Label
+	@FXML var angle_1 : ScrollBar
+	@FXML var angle_min_1 : Label
+	@FXML var angle_max_1 : Label
+	@FXML var angle_display_1 : Label
+	@FXML var angle_label_2 : Label
+	@FXML var angle_2 : ScrollBar
+	@FXML var angle_min_2 : Label
+	@FXML var angle_max_2 : Label
+	@FXML var angle_display_2 : Label
+	@FXML var angle_label_3 : Label
+	@FXML var angle_3 : ScrollBar
+	@FXML var angle_min_3 : Label
+	@FXML var angle_max_3 : Label
+	@FXML var angle_display_3 : Label
+	@FXML var angle_label_4 : Label
+	@FXML var angle_4 : ScrollBar
+	@FXML var angle_min_4 : Label
+	@FXML var angle_max_4 : Label
+	@FXML var angle_display_4 : Label
+	@FXML var angle_label_5 : Label
+	@FXML var angle_5 : ScrollBar
+	@FXML var angle_min_5 : Label
+	@FXML var angle_max_5 : Label
+	 @FXML var angle_display_5 : Label
+	@FXML var angle_label_6 : Label
+	@FXML var angle_6 : ScrollBar
+	@FXML var angle_min_6 : Label
+	@FXML var angle_max_6 : Label
+	@FXML var angle_display_6 : Label
+	@FXML var angle_label_7 : Label
+	@FXML var angle_7 : ScrollBar
+	@FXML var angle_min_7 : Label
+	@FXML var angle_max_7 : Label
+	@FXML var angle_display_7 : Label
+	@FXML var angle_label_8 : Label
+	@FXML var angle_8 : ScrollBar
+	@FXML var angle_min_8 : Label
+	@FXML var angle_max_8 : Label
+	@FXML var angle_display_8 : Label
+	@FXML var distance_label_1 : Label
+	@FXML var distance_1 : ScrollBar
+	@FXML var distance_min_1 : Label
+	@FXML var distance_max_1 : Label
+	@FXML var distance_display_1 : Label
+	@FXML var distance_label_2 : Label
+	@FXML var distance_2 : ScrollBar
+	@FXML var distance_min_2 : Label
+	@FXML var distance_max_2 : Label
+	@FXML var distance_display_2 : Label
+	@FXML var distance_label_3 : Label
+	@FXML var distance_3 : ScrollBar
+	@FXML var distance_min_3 : Label
+	@FXML var distance_max_3 : Label
+	@FXML var distance_display_3 : Label
+	@FXML var distance_label_4 : Label
+	@FXML var distance_4 : ScrollBar
+	@FXML var distance_min_4 : Label
+	@FXML var distance_max_4 : Label
+	@FXML var distance_display_4 : Label
+	@FXML var distance_label_5 : Label
+	@FXML var distance_5 : ScrollBar
+	@FXML var distance_min_5 : Label
+	@FXML var distance_max_5 : Label
+	@FXML var distance_display_5 : Label
+	@FXML var distance_label_6 : Label
+	@FXML var distance_6 : ScrollBar
+	@FXML var distance_min_6 : Label
+	@FXML var distance_max_6 : Label
+	@FXML var distance_display_6 : Label
+	@FXML var distance_label_7 : Label
+	@FXML var distance_7 : ScrollBar
+	@FXML var distance_min_7 : Label
+	@FXML var distance_max_7 : Label
+	@FXML var distance_display_7 : Label
+	@FXML var distance_label_8 : Label
+	@FXML var distance_8 : ScrollBar
+	@FXML var distance_min_8 : Label
+	@FXML var distance_max_8 : Label
+	@FXML var distance_display_8 : Label
+	@FXML var boids_infos_pane : Pane
+	@FXML var boid_group : Label
+	@FXML var boid_vitesse : Label
+	@FXML var boid_new_vitesse : Label
+	@FXML var boid_group_vitesse : Label
+	@FXML var boid_angle : Label
+	@FXML var boid_distance : Label
+	@FXML var boid_masse : Label
+	@FXML var boid_position : Label
+	@FXML var hide_infos : Button
+
+	def getBoidsQuantity : int {
+		Integer.parseInt(boids_quantity_input.text)
+	}
+	
+	def getMapSelection : int {
+		this.selectedMap
+	}
+
+	def getBoidsPopulation : int {
+		Integer.parseInt(boids_population_input.text)
+	}
+
+	def getMapWidth : int {
+		main_pane.width as int
+	}
+	
+	def getMapHeight : int {
+		main_pane.height as int
+	}
+
+	def getObstacles : List<Obstacle> {
+		obstacles.unmodifiableView
+	}
+	
+	def getBoidsSettings() : List<BoidGroupInfos> {
+		this.boidsSettings.unmodifiableView
+	}
+
+	@FXML protected def startSimu {
+		if(boids_population_input.text != '' && outputQuality(boids_population_input.text) && boids_quantity_input.text != '' && outputQuality(boids_quantity_input.text)) { 
+			for(var i : int = 1; i < this.boidsPopulation + 1; i++) {
+				if(i == 1) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_1.text), Integer.parseInt(speed_display_1.text), Integer.parseInt(angle_display_1.text), Integer.parseInt(distance_display_1.text)))
+				} else if (i == 2) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_2.text),Integer.parseInt(speed_display_2.text), Integer.parseInt(angle_display_2.text), Integer.parseInt(distance_display_2.text)))
+				} else if (i == 3) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_3.text), Integer.parseInt(speed_display_3.text), Integer.parseInt(angle_display_3.text), Integer.parseInt(distance_display_3.text)))
+				} else if (i == 4) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_4.text), Integer.parseInt(speed_display_4.text), Integer.parseInt(angle_display_4.text), Integer.parseInt(distance_display_4.text)))
+				} else if (i == 5) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_5.text), Integer.parseInt(speed_display_5.text), Integer.parseInt(angle_display_5.text), Integer.parseInt(distance_display_5.text)))
+				} else if (i == 6) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_6.text), Integer.parseInt(speed_display_6.text), Integer.parseInt(angle_display_6.text), Integer.parseInt(distance_display_6.text)))
+				} else if (i == 7) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_7.text), Integer.parseInt(speed_display_7.text), Integer.parseInt(angle_display_7.text), Integer.parseInt(distance_display_7.text)))
+				} else if (i == 8) {
+					boidsSettings.add(new BoidGroupInfos(Integer.parseInt(mass_display_8.text), Integer.parseInt(speed_display_8.text), Integer.parseInt(angle_display_8.text), Integer.parseInt(distance_display_8.text)))
+				}
+			}
+			var ^event = new ConfigureSimulation(this.mapSelection, this.boidsQuantity, this.boidsPopulation)
+			if (!launched) {
+				typeof(BootAgent).startAgentApplication() [
+					emitToAgents(^event)
+				]
+				launched = true
+				toggleUIState()
+				toggleMenuUIVisibility()
+				toggleSimuUIVisibility()
+				toggle_night_mode.background = new Background(new BackgroundFill(TRANSPARENT, CornerRadii.EMPTY, Insets.EMPTY))
+				if(nightMode) {
+					toggle_night_mode.textFill = rgb(191, 191, 191, 0.3)
+				} else {
+					toggle_night_mode.textFill = rgb(0, 0, 0, 0.3)
+				}	
+			} else {
+				emitToAgents(^event)
+			}
+		}
+	}
+	
+	def buildMap(map : int) : List<Obstacle> {
+		pause_button.visible = true
+		
+		if(map == 1) {
+			this.polygons = new ArrayList
+			return new ArrayList
+		} else if (map == 2) {
+			this.polygons = new ArrayList
+			this.obstacles = new ArrayList
+			this.polygons.add(new Polygon(250.0, 200.0, 365.0, 250.0, 400.0, 300.0, 325.0, 400.0, 205.0, 225.0))
+			this.polygons.add(new Polygon(605.0, 80.0, 675.0, 65.0, 680.0, 125.0, 650.0, 220.0, 630.0, 250.0, 660.0, 130.0,
+					665.0, 75.0, 615.0, 95.0, 560.0, 240.0, 560.0, 205.0))
+			this.polygons.add(new Polygon(450.0, 450.0, 575.0, 500.0, 575.0, 420.0, 700.0, 500.0, 590.0, 450.0, 590.0, 520.0))
+			this.polygons.forEach[p : Polygon |
+				p.setFill(GRAY)
+				p.setStroke(TRANSPARENT)
+				p.setStrokeWidth(20)
+			]
+
+			var command = new Runnable {
+				@Override
+				def run {
+					polygons.forEach [ p : Polygon |
+						obstacle_group.getChildren().add(0, p)
+					]
+				}
+			};
+			if (Platform.isFxApplicationThread()) {
+				command.run();
+				this.generateObstacles()				
+				return this.obstacles	
+			} else {
+				Platform.runLater(command);
+				this.generateObstacles()				
+				return this.obstacles
+			}
+		} else if (map == 3) {
+			this.polygons = new ArrayList
+			this.obstacles = new ArrayList
+			this.polygons.add(new Polygon(315.0, 720.0, 315.0, 250.0, 325.0, 250.0, 325.0, 720.0))
+			this.polygons.add(new Polygon(635.0, 470.0, 635.0, 0.0, 645.0, 0.0, 645.0, 470.0))
+			this.polygons.add(new Polygon(955.0, 720.0, 955.0, 250.0, 965.0, 250.0, 965.0, 720.0))
+
+			this.polygons.forEach [ p : Polygon |
+				p.setFill(GRAY)
+				p.setStroke(TRANSPARENT)
+				p.setStrokeWidth(20)
+			]
+
+			var command = new Runnable {
+				@Override
+				def run {
+					polygons.forEach [ p : Polygon |
+						obstacle_group.getChildren().add(0, p)
+					]
+				}
+			};
+			if (Platform.isFxApplicationThread()) {
+				command.run();
+				this.generateObstacles()
+				return this.obstacles
+			} else {
+				Platform.runLater(command);
+				this.generateObstacles()
+				return this.obstacles
+			}
+		}
+	}
+	
+	def generateObstacles {
+		 for (p : polygons) {
+			this.obstacles.add(new Obstacle(p))
+		 }
+	}
+
+	def updateGraphics(list: Collection<BoidBody>) {
+		var command = new Runnable {
+			@Override
+			def run {
+				perception_group.getChildren().clear()
+				boids_group.getChildren().clear()
+				perceptions.clear()
+				for (boid : list){
+					var boidElement : Polygon = new Polygon(boid.position.x, boid.position.y - 7.5, boid.position.x + 5,boid.position.y + 7.5, boid.position.x - 5, boid.position.y + 7.5)
+					var angleRotation : double
+					if (boid.speed.y != 0 ){
+						angleRotation = Math.toDegrees(Math.atan(boid.speed.x / (-boid.speed.y)))
+						if (angleRotation < 0) {
+							angleRotation += 180
+						}
+						if (boid.speed.x <= 0) {
+							if (boid.speed.y < 0) {
+								angleRotation += 180
+							} else {
+								angleRotation -= 180
+							}
+						}	
+					}else{
+						angleRotation = 0
+					}
+					
+					
+					boidElement.rotate = angleRotation
+					boidElement.setFill(Configuration::COLOR_FAMILY.get(boid.group))
+
+					perceptionManagement(boid, angleRotation, boidElement, boid.position.x, boid.position.y, false)
+					
+					boidElement.setOnMousePressed [^event |
+							if(currentPolygon !== null)
+								currentPolygon.strokeWidth = 0
+							currentBoid = boid.id
+							currentPolygon = (^event.source as Polygon)
+							updateInfos(boid)
+							showInfosVisibility()
+							(^event.source as Polygon).strokeWidth = 3
+							if(nightMode) (^event.source as Polygon).stroke = rgb(255, 255, 255, 0.5) else (^event.source as Polygon).stroke = rgb(0, 0, 0, 0.5)
+							orgSceneX = ^event.getSceneX()
+							orgSceneY = ^event.getSceneY()
+							orgTranslateX = (^event.source as Polygon).getTranslateX()
+							orgTranslateY = (^event.source as Polygon).getTranslateY()
+
+							savedPosition.clear()
+							(^event.source as Polygon).points.forEach[point : double |
+								savedPosition.add(point)
+							]
+
+							perception_group.getChildren.remove(perceptions.get(boid))
+							perceptions.remove(boid)
+						]
+					
+					boidElement.setOnMouseDragged [^event |
+							var offsetX : double = ^event.getSceneX() - orgSceneX
+							var offsetY : double = ^event.getSceneY() - orgSceneY
+							
+							var newTranslateX : double = orgTranslateX + offsetX;
+							var newTranslateY : double = orgTranslateY + offsetY;
+							
+							(^event.source as Polygon).setTranslateX(newTranslateX)
+							(^event.source as Polygon).setTranslateY(newTranslateY)
+						]
+					
+					boidElement.setOnMouseReleased [^event |
+							val calculX : double = ((^event.source as Polygon).points.get(0) + (^event.source as Polygon).points.get(2) + (^event.source as Polygon).points.get(4)) / 3
+							val calculY : double = ((^event.source as Polygon).points.get(1) + (^event.source as Polygon).points.get(3) + (^event.source as Polygon).points.get(5)) / 3
+
+							var valid : AtomicBoolean = new AtomicBoolean(true)
+							polygons.forEach [ p : Polygon |
+								if(p.contains(calculX + (^event.source as Polygon).translateX, calculY + (^event.source as Polygon).translateY))
+									valid.set(false)
+							]
+							
+							if (valid.get()) {
+								boid.position.x = calculX + (^event.source as Polygon).translateX;
+								boid.position.y = calculY + (^event.source as Polygon).translateY;
+								changePosition(currentBoid, calculX  + (^event.source as Polygon).translateX,calculY  + (^event.source as Polygon).translateY)
+								updateInfos(boid)
+							} else {
+								(^event.source as Polygon).translateX = 0
+								(^event.source as Polygon).translateY = 0
+							}
+							perceptionManagement(boid, (^event.source as Polygon).getRotate(), (^event.source as Polygon), calculX + (^event.source as Polygon).translateX, calculY + (^event.source as Polygon).translateY, true)
+						]
+					
+					if(boid.id == currentBoid) {
+						boidElement.strokeWidth = 3
+						if(nightMode) boidElement.stroke = rgb(255, 255, 255, 0.5) else boidElement.stroke = rgb(0, 0, 0, 0.5)
+					}
+					
+				}
+
+				if (boids_infos_pane.visible) {
+					var boidBody : BoidBody = list.findFirst[item | item.id == currentBoid]
+					updateInfos(boidBody)
+				}	
+			}
+		}
+		
+		if (Platform.isFxApplicationThread()) {
+			command.run();
+		} else {
+			Platform.runLater(command);
+		}	
+	}
+	
+	@FXML def perceptionManagement(boid : BoidBody, angleRotation : double, boidElement : Polygon, x : double, y : double, erase : Boolean) {
+		if (togglePerception) {
+			var perceptionArc = new Arc()
+			perceptionArc.setCenterX(x);
+			if(!erase) perceptionArc.setCenterY(boid.position.y) else perceptionArc.setCenterY(y - 3) // Sans le -3 c'est décalé, et je vois vraiment pas pourquoi
+			perceptionArc.setRadiusX(boid.perceptionDistance);
+			perceptionArc.setRadiusY(boid.perceptionDistance);
+			perceptionArc.setStartAngle(90 - angleRotation - boid.perceptionAngle)
+			perceptionArc.setLength(boid.perceptionAngle * 2);
+			perceptionArc.setType(ArcType.ROUND);
+			if (nightMode) {
+				perceptionArc.fill = rgb(255, 245, 112, 0.2)
+			} else {
+				perceptionArc.fill = rgb(255, 245, 112, 0.8)
+			}
+			if(!erase) boids_group.getChildren().add(0, boidElement)
+			perception_group.getChildren.add(0, perceptionArc)
+			perceptions.put(boid, perceptionArc)
+		} else {
+			if(!erase) boids_group.getChildren.add(0, boidElement)
+		}
+	}
+	
+	@FXML def changePosition(id : UUID, x : double, y : double) {
+		emitToAgents(new PositionChange(id, x, y))
+	}
+
+	@FXML def pause {
+		pause_button.visible = false
+		resume_button.visible = true
+		emitToAgents(new Pause)
+	}
+
+	@FXML def resume {
+		pause_button.visible = true
+		resume_button.visible = false
+		emitToAgents(new Resume)
+	}
+
+	@FXML protected def togglePerception {
+		if (togglePerception) {
+			togglePerception = false
+			perception_indicator.fill = TRANSPARENT
+			perceptions.forEach [ body : BoidBody, item : Arc |
+				item.fill = TRANSPARENT
+			]
+		} else {
+			togglePerception = true
+			perception_indicator.fill = rgb(0, 204, 99)
+			perceptions.forEach [ body : BoidBody, item : Arc |
+				if(nightMode) item.fill = rgb(255, 245, 112, 0.2) else item.fill = rgb(255, 245, 112, 0.8)
+			]
+		}
+	}
+
+	def updateInfos(boidBody : BoidBody) {
+		boid_group.text = 'Group: ' + boidBody.group
+		boid_vitesse.text = 'Speed: (' + String.format("%.3f", boidBody.speed.x) + ', ' +
+			String.format("%.3f", boidBody.speed.y) + ')'
+		boid_group_vitesse.text = 'Max speed: ' + boidBody.maxSpeed
+		boid_masse.text = 'Mass: ' + boidBody.mass
+		boid_angle.text = 'Angle: ' + boidBody.perceptionAngle
+		boid_distance.text = 'Distance: ' + boidBody.perceptionDistance
+		boid_new_vitesse.text = 'Expected speed: (' + boidBody.speedInfluence.x + ', ' + boidBody.speedInfluence.y + ')'
+		boid_position.text = 'Position: (' + String.format("%.3f", boidBody.position.x) + ', ' + String.format("%.3f", boidBody.position.y) + ')'
+	}
+	
+	@FXML protected def changeFocus {
+		main_pane.requestFocus()
+	}
+
+	def outputQuality(output : String) : boolean {
+		var outputQuality = false
+		try {
+			Integer.parseInt(boids_population_input.text)
+			outputQuality = true
+		} catch (e : NumberFormatException) {
+		}
+		return outputQuality
+	}
+	
+	@FXML protected def resetField(e : MouseEvent) {
+		(e.source as TextField).text = ''
+	}
+	
+	@FXML protected def updateField(e : KeyEvent) {
+		if((e.source as TextField).text != '') {
+			if(outputQuality((e.source as TextField).text)) {
+				var currentValue : int = Integer.parseInt((e.source as TextField).text)
+				if((e.source as TextField).id == 'boids_population_input') {
+					if (currentValue >= 8) {
+						(e.source as TextField).text = '' + 8
+					} else if (currentValue <= 1) {
+						(e.source as TextField).text = '' + 1
+					}
+					showGroupConfiguration()
+				} else if((e.source as TextField).id == 'boids_quantity_input') {
+					if (currentValue >= 50) {
+						(e.source as TextField).text = '' + 50
+					} else if (currentValue < 1) {
+						(e.source as TextField).text = '' + 1
+					}
+				}
+			}
+		}
+	}
+	
+	@FXML protected def incrementBoidsPopulation {
+		if(boids_population_input.text != '' && outputQuality(boids_population_input.text)) {
+			var currentValue : int = Integer.parseInt(boids_population_input.text)
+			if(currentValue >= 8) {
+				boids_population_input.text = '' + 8
+			} else {
+				boids_population_input.text = '' + (currentValue + 1)
+			}
+			showGroupConfiguration()
+		} else {
+			boids_population_input.text = '' + 1
+		}
+	}
+	
+	@FXML protected def decrementBoidsPopulation {
+		if(boids_population_input.text != '' && outputQuality(boids_population_input.text)) {
+			var currentValue : int = Integer.parseInt(boids_population_input.text)
+			if(currentValue <= 1) {
+				boids_population_input.text = '' + 1
+			} else {
+				boids_population_input.text = '' + (currentValue - 1)
+			}
+			showGroupConfiguration()
+		} else {
+			boids_population_input.text = '' + 1
+		}
+	}
+
+	@FXML protected def incrementBoidsQuantity {
+		if (boids_quantity_input.text != '' && outputQuality(boids_quantity_input.text)) {
+			var currentValue : int = Integer.parseInt(boids_quantity_input.text)
+			if (currentValue >= 50) {
+				boids_quantity_input.text = '' + 50
+			} else {
+				boids_quantity_input.text = '' + (currentValue + 1)
+			}
+		} else {
+			boids_quantity_input.text = '' + 1
+		}
+	}
+
+	@FXML protected def decrementBoidsQuantity {
+		if (boids_quantity_input.text != '' && outputQuality(boids_quantity_input.text)) {
+			var currentValue : int = Integer.parseInt(boids_quantity_input.text)
+			if (currentValue <= 1) {
+				boids_quantity_input.text = '' + 1
+			} else {
+				boids_quantity_input.text = '' + (currentValue - 1)
+			}
+		} else {
+			boids_quantity_input.text = '' + 1
+		}
+	}
+
+	@FXML protected def applyGlowEffectOnLabel(e : MouseEvent) {
+		if (nightMode)
+			(e.getSource() as Label).textFill = rgb(235, 221, 26)
+		else
+			(e.getSource() as Label).textFill = rgb(0, 0, 0)
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		(e.getSource() as Label).effect = glowEffect
+	}
+
+	@FXML protected def unapplyGlowEffectOnLabel(e : MouseEvent) {
+		if (nightMode)
+			(e.getSource() as Label).textFill = rgb(191, 191, 191)
+		else
+			(e.getSource() as Label).textFill = rgb(0, 0, 0)
+		(e.getSource() as Label).effect = null
+	}
+
+	@FXML protected def applyGlowEffectOnToggleButton(e : MouseEvent) {
+		if (nightMode)
+			(e.source as ToggleButton).textFill = rgb(235, 221, 26)
+		else
+			(e.source as ToggleButton).textFill = rgb(0, 0, 0)
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		(e.source as ToggleButton).effect = glowEffect
+	}
+
+	@FXML protected def unapplyGlowEffectOnToggleButton(e : MouseEvent) {
+		if (nightMode)
+			(e.getSource() as ToggleButton).textFill = rgb(191, 191, 191)
+		else
+			(e.getSource() as ToggleButton).textFill = rgb(0, 0, 0)
+		(e.getSource() as ToggleButton).effect = null
+	}
+
+	@FXML protected def applyGlowEffectOnButton(e : MouseEvent) {
+		if (nightMode)
+			(e.source as Button).textFill = rgb(235, 221, 26)
+		else
+			(e.source as Button).textFill = rgb(0, 0, 0)
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		(e.source as Button).effect = glowEffect
+	}
+
+	@FXML protected def unapplyGlowEffectOnButton(e : MouseEvent) {
+		if (nightMode)
+			(e.getSource() as Button).textFill = rgb(191, 191, 191)
+		else
+			(e.getSource() as Button).textFill = rgb(0, 0, 0)
+		(e.getSource() as Button).effect = null
+	}
+
+	@FXML protected def incrementBoidsPopulationGlow {
+		if (nightMode) {
+			boids_population_increment_circle.stroke = rgb(235, 221, 26)
+			increment_boids_population.textFill = rgb(235, 221, 26)
+		} else {
+			boids_population_increment_circle.stroke = rgb(0, 0, 0)
+			increment_boids_population.textFill = rgb(0, 0, 0)
+		}
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		boids_population_increment_circle.effect = glowEffect
+	}
+
+	@FXML protected def incrementBoidsPopulationReset {
+		if (nightMode) {
+			boids_population_increment_circle.stroke = rgb(191, 191, 191)
+			increment_boids_population.textFill = rgb(191, 191, 191)
+		} else {
+			boids_population_increment_circle.stroke = rgb(0, 0, 0, 0.3)
+			increment_boids_population.textFill = rgb(0, 0, 0)
+		}
+		boids_population_increment_circle.effect = null
+		increment_boids_population.effect = null
+	}
+
+	@FXML protected def decrementBoidsPopulationGlow {
+		if (nightMode) {
+			boids_population_decrement_circle.stroke = rgb(235, 221, 26)
+			decrement_boids_population.textFill = rgb(235, 221, 26)
+		} else {
+			boids_population_decrement_circle.stroke = rgb(0, 0, 0)
+			decrement_boids_population.textFill = rgb(0, 0, 0)
+		}
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		boids_population_decrement_circle.effect = glowEffect
+	}
+
+	@FXML protected def decrementBoidsPopulationReset {
+		if (nightMode) {
+			boids_population_decrement_circle.stroke = rgb(191, 191, 191)
+			decrement_boids_population.textFill = rgb(191, 191, 191)
+		} else {
+			boids_population_decrement_circle.stroke = rgb(0, 0, 0, 0.3)
+			increment_boids_population.textFill = rgb(0, 0, 0)
+		}
+		boids_population_decrement_circle.effect = null
+		decrement_boids_population.effect = null
+	}
+
+	@FXML protected def boidsPopulationGlow {
+		if (nightMode) {
+			boids_population_input.style = '-fx-text-fill: rgb(235, 221, 26); -fx-background-color: transparent'
+		} else {
+			boids_population_input.style = '-fx-text-fill: rgb(0, 0, 0); -fx-background-color: transparent'
+		}
+		boids_population_line.strokeWidth = 3
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		boids_population_input.effect = glowEffect
+	}
+
+	@FXML protected def boidsPopulationReset {
+		if (nightMode) {
+			boids_population_input.style = '-fx-text-fill: rgb(191, 191, 191); -fx-background-color: transparent'
+		} else {
+			boids_population_input.style = '-fx-text-fill: rgb(0, 0, 0); -fx-background-color: transparent'
+		}
+		boids_population_line.strokeWidth = 1
+		boids_population_input.effect = null
+	}
+
+	@FXML protected def incrementBoidsQuantityGlow {
+		if (nightMode) {
+			boids_quantity_increment_circle.stroke = rgb(235, 221, 26)
+			increment_boids_quantity.textFill = rgb(235, 221, 26)
+		} else {
+			boids_quantity_increment_circle.stroke = rgb(0, 0, 0)
+			increment_boids_quantity.textFill = rgb(0, 0, 0)
+		}
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		boids_quantity_increment_circle.effect = glowEffect
+	}
+
+	@FXML protected def decrementBoidsQuantityGlow {
+		if (nightMode) {
+			boids_quantity_decrement_circle.stroke = rgb(235, 221, 26)
+			decrement_boids_quantity.textFill = rgb(235, 221, 26)
+		} else {
+			boids_quantity_decrement_circle.stroke = rgb(0, 0, 0)
+			decrement_boids_quantity.textFill = rgb(0, 0, 0)
+		}
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		boids_quantity_decrement_circle.effect = glowEffect
+	}
+
+	@FXML protected def incrementBoidsQuantityReset {
+		if (nightMode) {
+			boids_quantity_increment_circle.stroke = rgb(191, 191, 191)
+			increment_boids_quantity.textFill = rgb(191, 191, 191)
+		} else {
+			boids_quantity_increment_circle.stroke = rgb(0, 0, 0, 0.3)
+			increment_boids_quantity.textFill = rgb(0, 0, 0)
+		}
+		boids_quantity_increment_circle.effect = null
+		increment_boids_quantity.effect = null
+	}
+
+	@FXML protected def decrementBoidsQuantityReset {
+		if (nightMode) {
+			boids_quantity_decrement_circle.stroke = rgb(191, 191, 191)
+			decrement_boids_quantity.textFill = rgb(191, 191, 191)
+		} else {
+			boids_quantity_decrement_circle.stroke = rgb(0, 0, 0, 0.3)
+			decrement_boids_quantity.textFill = rgb(0, 0, 0)
+		}
+		boids_quantity_decrement_circle.effect = null
+		decrement_boids_quantity.effect = null
+	}
+
+	@FXML protected def boidsQuantityGlow {
+		if (nightMode) {
+			boids_quantity_input.style = '-fx-text-fill: rgb(235, 221, 26); -fx-background-color: transparent'
+		} else {
+			boids_quantity_input.style = '-fx-text-fill: rgb(0, 0, 0); -fx-background-color: transparent'
+		}
+		boids_quantity_line.strokeWidth = 3
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		boids_quantity_input.effect = glowEffect
+	}
+
+	@FXML protected def boidsQuantityReset {
+		if (nightMode) {
+			boids_quantity_input.style = '-fx-text-fill: rgb(191, 191, 191); -fx-background-color: transparent'
+		} else {
+			boids_quantity_input.style = '-fx-text-fill: rgb(0, 0, 0); -fx-background-color: transparent'
+		}
+		boids_quantity_line.strokeWidth = 1
+		boids_quantity_input.effect = null
+	}
+
+	def toggleUIState {
+		if(start_button.disable == true) start_button.disable = false else start_button.disable = true
+		if(boids_quantity_input.disable == true) boids_quantity_input.disable = false else boids_quantity_input.disable = true
+		if(boids_population_input.disable == true) boids_population_input.disable = false else boids_population_input.disable = true
+	}
+
+	def toggleMenuUIVisibility {
+		if(UI_pane.visible) UI_pane.visible = false else UI_pane.visible = true
+	}
+
+	def toggleSimuUIVisibility {
+		if(!toggle_perception.visible) toggle_perception.visible = true else toggle_perception.visible = false
+		if(!perception_indicator.visible) perception_indicator.visible = true else perception_indicator.visible = false
+	}
+
+	def hideInfosVisibility {
+		this.resetTexts()
+		boids_infos_pane.visible = false
+		currentPolygon.strokeWidth = 0
+		currentPolygon = null
+		currentBoid = null
+	}
+
+	def showInfosVisibility {
+		boids_infos_pane.visible = true
+	}
+
+	def resetTexts {
+		boid_group.text = ''
+		boid_vitesse.text = ''
+		boid_group_vitesse.text = ''
+		boid_masse.text = ''
+		boid_angle.text = ''
+		boid_distance.text = ''
+		boid_new_vitesse.text = ''
+	}
+
+	@FXML protected def toggleAdvancedSettingsVisibility {
+		if (advanced_settings_pane.visible) {
+			advanced_settings_pane.visible = false
+		} else {
+			advanced_settings_pane.visible = true
+		}
+		showGroupConfiguration()
+	}
+
+	@FXML protected def paneTitleGlow(e : MouseEvent) {
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		if (e.getSource().toString.substring(0, 1) == 'P') { // P pour Pane
+			var pane = (e.getSource() as Pane).getId()
+			if (pane == 'simulation_parameters_pane') {
+				settings_label.effect = glowEffect
+			}
+		} else {
+			var pane = (e.getSource() as ScrollPane).getId()
+			if (pane == 'advanced_settings_pane') {
+				advanced_settings_label.effect = glowEffect
+			} else if (pane == 'map_selection_pane') {
+				map_selection_label.effect = glowEffect
+			}
+		}
+	}
+
+	@FXML protected def paneTitleReset {
+		map_selection_label.effect = null
+		settings_label.effect = null
+		advanced_settings_label.effect = null
+	}
+
+	@FXML protected def subPaneTitleGlow(e : MouseEvent) {
+		var glowEffect = new Glow()
+		glowEffect.level = 0.8
+		if ((e.getSource() as Pane).getId() == 'pane_group_1')
+			group_label_1.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_2')
+			group_label_2.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_3')
+			group_label_3.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_4')
+			group_label_4.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_5')
+			group_label_5.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_6')
+			group_label_6.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_7')
+			group_label_7.effect = glowEffect
+		else if ((e.getSource() as Pane).getId() == 'pane_group_8')
+			group_label_8.effect = glowEffect
+	}
+
+	@FXML protected def subPaneTitleReset {
+		group_label_1.effect = null; group_label_2.effect = null; group_label_3.effect = null; group_label_4.effect = null; group_label_5.effect = null; group_label_6.effect = null; group_label_7.effect = null; group_label_8.effect = null
+	}
+
+	@FXML protected def previewMapGlow(e : MouseEvent) {
+		var targetMap : int = 0
+		if (e.getSource().toString.substring(0, 1) == 'I') { // I pour ImageView
+			targetMap = Integer.parseInt((e.getSource() as ImageView).getId().substring((e.getSource() as ImageView).getId().length() - 1))
+		} else {
+			targetMap = Integer.parseInt((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1))
+		}
+
+		var glowEffect = new Glow()
+		glowEffect.level = 1
+		
+		switch(targetMap) {
+			case 1: {
+				if (this.selectedMap != 1) {
+					if (nightMode) {
+						preview_map_1_border.stroke = rgb(235, 221, 26, 0.6)
+						map_label_1.textFill = rgb(235, 221, 26, 0.6)
+					} else {
+						preview_map_1_border.stroke = rgb(0, 0, 0, 0.35)
+						map_label_1.textFill = rgb(0, 0, 0, 0.6)
+					}
+					preview_map_1_border.effect = glowEffect
+					map_label_1.effect = glowEffect
+				}
+			}
+			case 2: {
+				if (selectedMap != 2) {
+					if (nightMode) {
+						preview_map_2_border.stroke = rgb(235, 221, 26, 0.6)
+						map_label_2.textFill = rgb(235, 221, 26, 0.6)
+					} else {
+						preview_map_2_border.stroke = rgb(0, 0, 0, 0.6)
+						map_label_2.textFill = rgb(0, 0, 0, 0.6)
+					}
+					preview_map_2_border.effect = glowEffect
+					map_label_2.effect = glowEffect
+				}
+			}
+			case 3: {
+				if (selectedMap != 3) {
+					if (nightMode) {
+						preview_map_3_border.stroke = rgb(235, 221, 26, 0.6)
+						map_label_3.textFill = rgb(235, 221, 26, 0.6)
+					} else {
+						preview_map_3_border.stroke = rgb(0, 0, 0, 0.6)
+						map_label_3.textFill = rgb(0, 0, 0, 0.6)
+					}
+					preview_map_3_border.effect = glowEffect
+					map_label_3.effect = glowEffect
+				}
+			}
+			case 4: {
+				if (selectedMap != 4) {
+					if (nightMode) {
+						preview_map_4_border.stroke = rgb(235, 221, 26, 0.6)
+						map_label_4.textFill = rgb(235, 221, 26, 0.6)
+					} else {
+						preview_map_4_border.stroke = rgb(0, 0, 0, 0.6)
+						map_label_4.textFill = rgb(0, 0, 0, 0.6)
+					}
+					preview_map_4_border.effect = glowEffect
+					map_label_4.effect = glowEffect
+				}
+			}
+		}
+	}
+
+	@FXML protected def previewMapReset(e : MouseEvent) {
+		if(e !== null) {
+			var targetMap : int = 0
+			if (e.getSource().toString.substring(0, 1) == 'I') { // I pour ImageView
+				targetMap = Integer.parseInt((e.getSource() as ImageView).getId().substring((e.getSource() as ImageView).getId().length() - 1))
+			} else {
+				targetMap = Integer.parseInt((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1))
+			}
+			
+			switch(targetMap) {
+				case 1: {
+					if (selectedMap != 1) {
+						if (nightMode) {
+							preview_map_1_border.stroke = rgb(191, 191, 191)
+							map_label_1.textFill = rgb(191, 191, 191)
+						} else {
+							preview_map_1_border.stroke = rgb(0, 0, 0, 0.6)
+							map_label_1.textFill = rgb(0, 0, 0, 0.6)
+						}
+						preview_map_1_border.effect = null
+						map_label_1.effect = null
+					}
+				}
+				case 2: {
+					if (selectedMap != 2) {
+						if (nightMode) {
+							preview_map_2_border.stroke = rgb(191, 191, 191)
+							map_label_2.textFill = rgb(191, 191, 191)
+						} else {
+							preview_map_2_border.stroke = rgb(0, 0, 0, 0.6)
+							map_label_2.textFill = rgb(0, 0, 0, 0.6)
+						}
+						preview_map_2_border.effect = null
+						map_label_2.effect = null
+					}
+				}
+				case 3: {
+					if (selectedMap != 3) {
+						if (nightMode) {
+							preview_map_3_border.stroke = rgb(191, 191, 191)
+							map_label_3.textFill = rgb(191, 191, 191)
+						} else {
+							preview_map_3_border.stroke = rgb(0, 0, 0, 0.6)
+							map_label_3.textFill = rgb(0, 0, 0, 0.6)
+						}
+						preview_map_3_border.effect = null
+						map_label_3.effect = null
+					}
+				}
+				case 4: {
+					if (selectedMap != 4) {
+						if (nightMode) {
+							preview_map_4_border.stroke = rgb(191, 191, 191)
+							map_label_4.textFill = rgb(191, 191, 191)
+						} else {
+							preview_map_4_border.stroke = rgb(0, 0, 0, 0.6)
+							map_label_4.textFill = rgb(0, 0, 0, 0.6)
+						}
+						preview_map_4_border.effect = null
+						map_label_4.effect = null
+					}
+				}
+			}	
+		} else {
+			if (nightMode) {
+				preview_map_1_border.stroke = rgb(191, 191, 191)
+				map_label_1.textFill = rgb(191, 191, 191)
+			} else {
+				preview_map_1_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_1.textFill = rgb(0, 0, 0, 0.6)
+			}
+			preview_map_1_border.effect = null
+			map_label_1.effect = null	
+		
+			if (nightMode) {
+				preview_map_2_border.stroke = rgb(191, 191, 191)
+				map_label_2.textFill = rgb(191, 191, 191)
+			} else {
+				preview_map_2_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_2.textFill = rgb(0, 0, 0, 0.6)
+			}
+			preview_map_2_border.effect = null
+			map_label_2.effect = null
+		
+			if (nightMode) {
+				preview_map_3_border.stroke = rgb(191, 191, 191)
+				map_label_3.textFill = rgb(191, 191, 191)
+			} else {
+				preview_map_3_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_3.textFill = rgb(0, 0, 0, 0.6)
+			}
+			preview_map_3_border.effect = null
+			map_label_3.effect = null
+
+			if (nightMode) {
+				preview_map_4_border.stroke = rgb(191, 191, 191)
+				map_label_4.textFill = rgb(191, 191, 191)
+			} else {
+				preview_map_4_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_4.textFill = rgb(0, 0, 0, 0.6)
+			}
+			preview_map_4_border.effect = null
+			map_label_4.effect = null
+		}
+	}
+
+	@FXML protected def selectMap(e : MouseEvent) {
+		if(e.getSource().toString.substring(0, 1) == 'I') { // I pour ImageView
+			this.selectedMap = Integer.parseInt((e.getSource() as ImageView).getId().substring((e.getSource() as ImageView).getId().length() - 1))
+		} else {
+			this.selectedMap = Integer.parseInt((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1))	
+		}
+		resetMaps()
+		switch(this.selectedMap) {
+			case 1: {
+				if (nightMode) {
+					preview_map_1_border.stroke = rgb(235, 221, 26)
+					map_label_1.textFill = rgb(235, 221, 26)
+				} else {
+					preview_map_1_border.stroke = rgb(0, 0, 0)
+					map_label_1.textFill = rgb(0, 0, 0)
+				}	
+
+				var glowEffect = new Glow()
+				glowEffect.level = 0.8
+				preview_map_1_border.effect = glowEffect
+				map_label_1.effect = glowEffect
+				tick_map_1.visible = true
+			}
+			case 2: {
+				if (nightMode) {
+					preview_map_2_border.stroke = rgb(235, 221, 26)
+					map_label_2.textFill = rgb(235, 221, 26)
+				} else {
+					preview_map_2_border.stroke = rgb(0, 0, 0)
+					map_label_2.textFill = rgb(0, 0, 0)
+				}
+
+				var glowEffect = new Glow()
+				glowEffect.level = 0.8
+				preview_map_2_border.effect = glowEffect
+				map_label_2.effect = glowEffect
+				tick_map_2.visible = true
+			}
+			case 3: {
+				if (nightMode) {
+					preview_map_3_border.stroke = rgb(235, 221, 26)
+					map_label_3.textFill = rgb(235, 221, 26)
+				} else {
+					preview_map_3_border.stroke = rgb(0, 0, 0)
+					map_label_3.textFill = rgb(0, 0, 0)
+				}
+
+				var glowEffect = new Glow()
+				glowEffect.level = 0.8
+				preview_map_3_border.effect = glowEffect
+				map_label_3.effect = glowEffect
+				tick_map_3.visible = true
+			}
+			/*case 4: {
+				if (nightMode) {
+					preview_map_4_border.stroke = rgb(235, 221, 26)
+					map_label_4.textFill = rgb(235, 221, 26)
+				} else {
+					preview_map_4_border.stroke = rgb(0, 0, 0)
+					map_label_4.textFill = rgb(0, 0, 0)
+				}
+
+				var glowEffect = new Glow()
+				glowEffect.level = 0.8
+				preview_map_4_border.effect = glowEffect
+				map_label_4.effect = glowEffect
+				tick_map_4.visible = true
+			}*/
+		}
+	}
+
+	protected def resetMaps {
+		previewMapReset(null)
+		
+		tick_map_1.visible = false
+		tick_map_2.visible = false
+		tick_map_3.visible = false
+		tick_map_4.visible = false
+	}
+
+	@FXML protected def showGroupConfiguration {
+		if (this.boidsPopulation <= 4) advanced_settings_anchor_pane.prefHeight = 330 else advanced_settings_anchor_pane.prefHeight = 600
+		if (this.boidsPopulation >= 1) pane_group_1.visible = true else	pane_group_1.visible = false
+		if (this.boidsPopulation >= 2) pane_group_2.visible = true else	pane_group_2.visible = false
+		if (this.boidsPopulation >= 3) pane_group_3.visible = true else	pane_group_3.visible = false
+		if (this.boidsPopulation >= 4) pane_group_4.visible = true else	pane_group_4.visible = false
+		if (this.boidsPopulation >= 5) pane_group_5.visible = true else	pane_group_5.visible = false
+		if (this.boidsPopulation >= 6) pane_group_6.visible = true else	pane_group_6.visible = false
+		if (this.boidsPopulation >= 7) pane_group_7.visible = true else	pane_group_7.visible = false
+		if (this.boidsPopulation >= 8) pane_group_8.visible = true else	pane_group_8.visible = false
+	}	
+
+	@FXML protected def resetGroupValues {
+		mass_1.value = Configuration::DEFAULT_MASS
+		mass_display_1.setText(Configuration::DEFAULT_MASS.toString())
+		speed_1.value = Configuration::DEFAULT_SPEED
+		speed_display_1.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_1.value = Configuration::DEFAULT_ANGLE
+		angle_display_1.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_1.value = Configuration::DEFAULT_DISTANCE
+		distance_display_1.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_2.value = Configuration::DEFAULT_MASS
+		mass_display_2.setText(Configuration::DEFAULT_MASS.toString())
+		speed_2.value = Configuration::DEFAULT_SPEED
+		speed_display_2.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_2.value = Configuration::DEFAULT_ANGLE
+		angle_display_2.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_2.value = Configuration::DEFAULT_DISTANCE
+		distance_display_2.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_3.value = Configuration::DEFAULT_MASS
+		mass_display_3.setText(Configuration::DEFAULT_MASS.toString())
+		speed_3.value = Configuration::DEFAULT_SPEED
+		speed_display_3.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_3.value = Configuration::DEFAULT_ANGLE
+		angle_display_3.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_3.value = Configuration::DEFAULT_DISTANCE
+		distance_display_3.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_4.value = Configuration::DEFAULT_MASS
+		mass_display_4.setText(Configuration::DEFAULT_MASS.toString())
+		speed_4.value = Configuration::DEFAULT_SPEED
+		speed_display_4.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_4.value = Configuration::DEFAULT_ANGLE
+		angle_display_4.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_4.value = Configuration::DEFAULT_DISTANCE
+		distance_display_4.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_5.value = Configuration::DEFAULT_MASS
+		mass_display_5.setText(Configuration::DEFAULT_MASS.toString())
+		speed_5.value = Configuration::DEFAULT_SPEED
+		speed_display_5.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_5.value = Configuration::DEFAULT_ANGLE
+		angle_display_5.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_5.value = Configuration::DEFAULT_DISTANCE
+		distance_display_5.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_6.value = Configuration::DEFAULT_MASS
+		mass_display_6.setText(Configuration::DEFAULT_MASS.toString())
+		speed_6.value = Configuration::DEFAULT_SPEED
+		speed_display_6.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_6.value = Configuration::DEFAULT_ANGLE
+		angle_display_6.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_6.value = Configuration::DEFAULT_DISTANCE
+		distance_display_6.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_7.value = Configuration::DEFAULT_MASS
+		mass_display_7.setText(Configuration::DEFAULT_MASS.toString())
+		speed_7.value = Configuration::DEFAULT_SPEED
+		speed_display_7.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_7.value = Configuration::DEFAULT_ANGLE
+		angle_display_7.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_7.value = Configuration::DEFAULT_DISTANCE
+		distance_display_7.setText(Configuration::DEFAULT_DISTANCE.toString())
+		mass_8.value = Configuration::DEFAULT_MASS
+		mass_display_8.setText(Configuration::DEFAULT_MASS.toString())
+		speed_8.value = Configuration::DEFAULT_SPEED
+		speed_display_8.setText(Configuration::DEFAULT_SPEED.toString())
+		angle_8.value = Configuration::DEFAULT_ANGLE
+		angle_display_8.setText(Configuration::DEFAULT_ANGLE.toString())
+		distance_8.value = Configuration::DEFAULT_DISTANCE
+		distance_display_8.setText(Configuration::DEFAULT_DISTANCE.toString())
+	}
+
+	@FXML protected def massListener(e : MouseEvent) {
+		(e.getSource() as ScrollBar).valueProperty().addListener [
+			if((e.getSource() as ScrollBar).getId() == 'mass_1')
+				mass_display_1.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_2')
+				mass_display_2.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_3')
+				mass_display_3.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_4')
+				mass_display_4.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_5')
+				mass_display_5.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_6')
+				mass_display_6.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_7')
+				mass_display_7.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'mass_8')
+				mass_display_8.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+		];
+	}
+
+	@FXML protected def speedListener(e : MouseEvent) {
+		(e.getSource() as ScrollBar).valueProperty().addListener [
+			if ((e.getSource() as ScrollBar).getId() == 'speed_1')
+				speed_display_1.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_2')
+				speed_display_2.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_3')
+				speed_display_3.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_4')
+				speed_display_4.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_5')
+				speed_display_5.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_6')
+				speed_display_6.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_7')
+				speed_display_7.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'speed_8')
+				speed_display_8.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+		];
+	}
+
+	@FXML protected def angleListener(e : MouseEvent) {
+		(e.getSource() as ScrollBar).valueProperty().addListener [
+			if ((e.getSource() as ScrollBar).getId() == 'angle_1')
+				angle_display_1.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_2')
+				angle_display_2.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_3')
+				angle_display_3.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_4')
+				angle_display_4.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_5')
+				angle_display_5.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_6')
+				angle_display_6.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_7')
+				angle_display_7.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'angle_8')
+				angle_display_8.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+		];
+	}
+
+	@FXML protected def distanceListener(e : MouseEvent) {
+		(e.getSource() as ScrollBar).valueProperty().addListener [
+			if ((e.getSource() as ScrollBar).getId() == 'distance_1')
+				distance_display_1.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_2')
+				distance_display_2.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_3')
+				distance_display_3.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_4')
+				distance_display_4.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_5')
+				distance_display_5.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_6')
+				distance_display_6.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_7')
+				distance_display_7.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+			else if ((e.getSource() as ScrollBar).getId() == 'distance_8')
+				distance_display_8.setText(String.format("%.0f", (e.getSource() as ScrollBar).getValue()))
+		];
+	}
+
+	@FXML protected def setFastMassValues(e : MouseEvent) {
+		if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '1') {
+			mass_1.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_1.text = (e.getSource() as Label).text
+		} else if((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '2') {
+			mass_2.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_2.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '3') {
+			mass_3.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_3.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '4') {
+			mass_4.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_4.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '5') {
+			mass_5.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_5.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '6') {
+			mass_6.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_6.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '7') {
+			mass_7.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_7.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '8') {
+			mass_8.value = Integer.parseInt((e.getSource() as Label).text)
+			mass_display_8.text = (e.getSource() as Label).text
+		}
+	}
+
+	@FXML protected def setFastSpeedValues(e : MouseEvent) {
+		if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '1') {
+			speed_1.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_1.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '2') {
+			speed_2.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_2.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '3') {
+			speed_3.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_3.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '4') {
+			speed_4.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_4.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '5') {
+			speed_5.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_5.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '6') {
+			speed_6.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_6.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '7') {
+			speed_7.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_7.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '8') {
+			speed_8.value = Integer.parseInt((e.getSource() as Label).text)
+			speed_display_8.text = (e.getSource() as Label).text
+		}
+	}
+
+	@FXML protected def setFastAngleValues(e : MouseEvent) {
+		if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '1') {
+			angle_1.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_1.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '2') {
+			angle_2.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_2.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '3') {
+			angle_3.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_3.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '4') {
+			angle_4.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_4.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '5') {
+			angle_5.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_5.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '6') {
+			angle_6.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_6.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '7') {
+			angle_7.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_7.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '8') {
+			angle_8.value = Integer.parseInt((e.getSource() as Label).text)
+			angle_display_8.text = (e.getSource() as Label).text
+		}
+	}
+
+	@FXML protected def setFastDistanceValues(e : MouseEvent) {
+		if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '1') {
+			distance_1.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_1.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '2') {
+			distance_2.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_2.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '3') {
+			distance_3.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_3.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '4') {
+			distance_4.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_4.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '5') {
+			distance_5.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_5.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '6') {
+			distance_6.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_6.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '7') {
+			distance_7.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_7.text = (e.getSource() as Label).text
+		} else if ((e.getSource() as Label).getId().substring((e.getSource() as Label).getId().length() - 1) == '8') {
+			distance_8.value = Integer.parseInt((e.getSource() as Label).text)
+			distance_display_8.text = (e.getSource() as Label).text
+		}
+	}
+
+	@FXML protected def toggleMode {
+		if(nightMode) {
+			nightMode = false
+			night_mode_indicator.fill = TRANSPARENT
+			night_mode_indicator.stroke = rgb(0, 0, 0, 0.3)
+			perception_indicator.stroke = rgb(0, 0, 0, 0.3)
+			var normalTextColor = BLACK
+			main_pane.background = new Background(new BackgroundFill(rgb(244, 244, 244), CornerRadii.EMPTY, Insets.EMPTY))
+			boids_quantity_label.textFill = normalTextColor; decrement_boids_quantity.textFill = normalTextColor; increment_boids_quantity.textFill = normalTextColor; boids_quantity_decrement_circle.stroke = normalTextColor; boids_quantity_increment_circle.stroke = normalTextColor; boids_quantity_line.stroke = normalTextColor; boids_quantity_input.style = '-fx-text-fill: rgb(0, 0, 0); -fx-background-color: transparent'
+			boids_population_label.textFill = normalTextColor; decrement_boids_population.textFill = normalTextColor; increment_boids_population.textFill = normalTextColor; boids_population_decrement_circle.stroke = normalTextColor; boids_population_increment_circle.stroke = normalTextColor; boids_population_line.stroke = normalTextColor; boids_population_input.style = '-fx-text-fill: rgb(0, 0, 0); -fx-background-color: transparent'
+			
+			boid_group.textFill = rgb(0, 0, 0, 0.7); boid_vitesse.textFill = rgb(0, 0, 0, 0.7);	boid_group_vitesse.textFill = rgb(0, 0, 0, 0.7); boid_masse.textFill = rgb(0, 0, 0, 0.7); boid_angle.textFill = rgb(0, 0, 0, 0.7); boid_distance.textFill = rgb(0, 0, 0, 0.7); boid_new_vitesse.textFill = rgb(0, 0, 0, 0.7); boid_position.textFill = rgb(0, 0, 0, 0.7);
+			
+			toggle_night_mode.textFill = rgb(0, 0, 0, 0.3)
+			toggle_perception.textFill = rgb(0, 0, 0, 0.3)
+			hide_infos.textFill = rgb(0, 0, 0, 0.3)
+			start_button.textFill = normalTextColor
+			see_advanced_settings_label.textFill = normalTextColor
+			reset_group_values.textFill = normalTextColor
+			
+			group_label_1.textFill = normalTextColor
+			mass_label_1.textFill = normalTextColor; mass_min_1.textFill = normalTextColor;	mass_max_1.textFill = normalTextColor; mass_display_1.textFill = normalTextColor
+			speed_label_1.textFill = normalTextColor; speed_min_1.textFill = normalTextColor; speed_max_1.textFill = normalTextColor; speed_display_1.textFill = normalTextColor
+			angle_label_1.textFill = normalTextColor; angle_min_1.textFill = normalTextColor; angle_max_1.textFill = normalTextColor; angle_display_1.textFill = normalTextColor
+			distance_label_1.textFill = normalTextColor; distance_min_1.textFill = normalTextColor;	distance_max_1.textFill = normalTextColor; distance_display_1.textFill = normalTextColor
+
+			group_label_2.textFill = normalTextColor
+			mass_label_2.textFill = normalTextColor; mass_min_2.textFill = normalTextColor;	mass_max_2.textFill = normalTextColor; mass_display_2.textFill = normalTextColor
+			speed_label_2.textFill = normalTextColor; speed_min_2.textFill = normalTextColor; speed_max_2.textFill = normalTextColor; speed_display_2.textFill = normalTextColor
+			angle_label_2.textFill = normalTextColor; angle_min_2.textFill = normalTextColor; angle_max_2.textFill = normalTextColor; angle_display_2.textFill = normalTextColor
+			distance_label_2.textFill = normalTextColor; distance_min_2.textFill = normalTextColor; distance_max_2.textFill = normalTextColor; distance_display_2.textFill = normalTextColor
+
+			group_label_3.textFill = normalTextColor
+			mass_label_3.textFill = normalTextColor; mass_min_3.textFill = normalTextColor; mass_max_3.textFill = normalTextColor; mass_display_3.textFill = normalTextColor
+			speed_label_3.textFill = normalTextColor; speed_min_3.textFill = normalTextColor; speed_max_3.textFill = normalTextColor; speed_display_3.textFill = normalTextColor
+			angle_label_3.textFill = normalTextColor; angle_min_3.textFill = normalTextColor; angle_max_3.textFill = normalTextColor; angle_display_3.textFill = normalTextColor
+			distance_label_3.textFill = normalTextColor; distance_min_3.textFill = normalTextColor;	distance_max_3.textFill = normalTextColor; distance_display_3.textFill = normalTextColor
+
+			group_label_4.textFill = normalTextColor
+			mass_label_4.textFill = normalTextColor; mass_min_4.textFill = normalTextColor; mass_max_4.textFill = normalTextColor; mass_display_4.textFill = normalTextColor
+			speed_label_4.textFill = normalTextColor; speed_min_4.textFill = normalTextColor; speed_max_4.textFill = normalTextColor; speed_display_4.textFill = normalTextColor
+			angle_label_4.textFill = normalTextColor; angle_min_4.textFill = normalTextColor; angle_max_4.textFill = normalTextColor; angle_display_4.textFill = normalTextColor
+			distance_label_4.textFill = normalTextColor; distance_min_4.textFill = normalTextColor;	distance_max_4.textFill = normalTextColor; distance_display_4.textFill = normalTextColor
+
+			group_label_5.textFill = normalTextColor
+			mass_label_5.textFill = normalTextColor; mass_min_5.textFill = normalTextColor;	mass_max_5.textFill = normalTextColor; mass_display_5.textFill = normalTextColor
+			speed_label_5.textFill = normalTextColor; speed_min_5.textFill = normalTextColor; speed_max_5.textFill = normalTextColor; speed_display_5.textFill = normalTextColor
+			angle_label_5.textFill = normalTextColor; angle_min_5.textFill = normalTextColor; angle_max_5.textFill = normalTextColor; angle_display_5.textFill = normalTextColor
+			distance_label_5.textFill = normalTextColor; distance_min_5.textFill = normalTextColor;	distance_max_5.textFill = normalTextColor; distance_display_5.textFill = normalTextColor
+
+			group_label_6.textFill = normalTextColor
+			mass_label_6.textFill = normalTextColor; mass_min_6.textFill = normalTextColor;	mass_max_6.textFill = normalTextColor; mass_display_6.textFill = normalTextColor
+			speed_label_6.textFill = normalTextColor; speed_min_6.textFill = normalTextColor; speed_max_6.textFill = normalTextColor; speed_display_6.textFill = normalTextColor
+			angle_label_6.textFill = normalTextColor; angle_min_6.textFill = normalTextColor; angle_max_6.textFill = normalTextColor; angle_display_6.textFill = normalTextColor
+			distance_label_6.textFill = normalTextColor; distance_min_6.textFill = normalTextColor;	distance_max_6.textFill = normalTextColor; distance_display_6.textFill = normalTextColor
+
+			group_label_7.textFill = normalTextColor
+			mass_label_7.textFill = normalTextColor; mass_min_7.textFill = normalTextColor; mass_max_7.textFill = normalTextColor; mass_display_7.textFill = normalTextColor
+			speed_label_7.textFill = normalTextColor; speed_min_7.textFill = normalTextColor; speed_max_7.textFill = normalTextColor; speed_display_7.textFill = normalTextColor
+			angle_label_7.textFill = normalTextColor; angle_min_7.textFill = normalTextColor; angle_max_7.textFill = normalTextColor; angle_display_7.textFill = normalTextColor
+			distance_label_7.textFill = normalTextColor; distance_min_7.textFill = normalTextColor;	distance_max_7.textFill = normalTextColor; distance_display_7.textFill = normalTextColor
+
+			group_label_8.textFill = normalTextColor
+			mass_label_8.textFill = normalTextColor; mass_min_8.textFill = normalTextColor; mass_max_8.textFill = normalTextColor; mass_display_8.textFill = normalTextColor
+			speed_label_8.textFill = normalTextColor; speed_min_8.textFill = normalTextColor; speed_max_8.textFill = normalTextColor; speed_display_8.textFill = normalTextColor
+			angle_label_8.textFill = normalTextColor; angle_min_8.textFill = normalTextColor; angle_max_8.textFill = normalTextColor; angle_display_8.textFill = normalTextColor
+			distance_label_8.textFill = normalTextColor; distance_min_8.textFill = normalTextColor; distance_max_8.textFill = normalTextColor; distance_display_8.textFill = normalTextColor
+
+			if(this.selectedMap != 1) {
+				preview_map_1_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_1.textFill = normalTextColor
+			} else if (this.selectedMap == 1) {
+				preview_map_1_border.stroke = rgb(0, 0, 0)
+				map_label_1.textFill = rgb(0, 0, 0)
+			}
+			
+			if(this.selectedMap != 2) {
+				preview_map_2_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_2.textFill = normalTextColor
+			} else if (this.selectedMap == 2) {
+				preview_map_2_border.stroke = rgb(0, 0, 0)
+				map_label_2.textFill = rgb(0, 0, 0)
+			}
+			
+			if(this.selectedMap != 3) {
+				preview_map_3_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_3.textFill = normalTextColor
+			} else if (this.selectedMap == 3) {
+				preview_map_3_border.stroke = rgb(0, 0, 0)
+				map_label_3.textFill = rgb(0, 0, 0)
+			}
+
+			if (this.selectedMap != 4) {
+				preview_map_4_border.stroke = rgb(0, 0, 0, 0.6)
+				map_label_4.textFill = normalTextColor
+			} else if (this.selectedMap == 3) {
+				preview_map_4_border.stroke = rgb(0, 0, 0)
+				map_label_4.textFill = rgb(0, 0, 0)
+			}
+			
+		} else {
+			nightMode = true
+			night_mode_indicator.fill = rgb(0, 204, 99)
+			night_mode_indicator.stroke = rgb(184, 193, 207, 0.3)
+			perception_indicator.stroke = rgb(184, 193, 207, 0.3)
+			var nightTextColor = rgb(191, 191, 191)
+			main_pane.background = new Background(new BackgroundFill(rgb(34, 34, 34), CornerRadii.EMPTY, Insets.EMPTY))
+			boids_quantity_label.textFill = nightTextColor;	decrement_boids_quantity.textFill = nightTextColor;	increment_boids_quantity.textFill = nightTextColor;	boids_quantity_decrement_circle.stroke = nightTextColor; boids_quantity_increment_circle.stroke = nightTextColor; boids_quantity_line.stroke = nightTextColor; boids_quantity_input.style = '-fx-text-fill: rgb(191, 191, 191); -fx-background-color: transparent'
+			boids_population_label.textFill = nightTextColor; decrement_boids_population.textFill = nightTextColor; increment_boids_population.textFill = nightTextColor; boids_population_decrement_circle.stroke = nightTextColor; boids_population_increment_circle.stroke = nightTextColor;	boids_population_line.stroke = nightTextColor;	boids_population_input.style = '-fx-text-fill: rgb(191, 191, 191); -fx-background-color: transparent'
+			
+			boid_group.textFill = rgb(191, 191, 191, 0.7); boid_vitesse.textFill = rgb(191, 191, 191, 0.7);	boid_group_vitesse.textFill = rgb(191, 191, 191, 0.7); boid_masse.textFill = rgb(191, 191, 191, 0.7); boid_angle.textFill = rgb(191, 191, 191, 0.7); boid_distance.textFill = rgb(191, 191, 191, 0.7); boid_new_vitesse.textFill = rgb(191, 191, 191, 0.7); boid_position.textFill = rgb(191, 191, 191, 0.7);
+			
+			toggle_night_mode.textFill = rgb(191, 191, 191, 0.3)
+			toggle_perception.textFill = rgb(191, 191, 191, 0.3)
+			hide_infos.textFill = rgb(191, 191, 191, 0.3)
+			start_button.textFill = nightTextColor
+			see_advanced_settings_label.textFill = nightTextColor
+			reset_group_values.textFill = nightTextColor
+
+			group_label_1.textFill = nightTextColor
+			mass_label_1.textFill = nightTextColor; mass_min_1.textFill = nightTextColor; mass_max_1.textFill = nightTextColor; mass_display_1.textFill = nightTextColor
+			speed_label_1.textFill = nightTextColor; speed_min_1.textFill = nightTextColor; speed_max_1.textFill = nightTextColor; speed_display_1.textFill = nightTextColor
+			angle_label_1.textFill = nightTextColor; angle_min_1.textFill = nightTextColor; angle_max_1.textFill = nightTextColor; angle_display_1.textFill = nightTextColor
+			distance_label_1.textFill = nightTextColor; distance_min_1.textFill = nightTextColor; distance_max_1.textFill = nightTextColor; distance_display_1.textFill = nightTextColor
+
+			group_label_2.textFill = nightTextColor
+			mass_label_2.textFill = nightTextColor; mass_min_2.textFill = nightTextColor; mass_max_2.textFill = nightTextColor; mass_display_2.textFill = nightTextColor
+			speed_label_2.textFill = nightTextColor; speed_min_2.textFill = nightTextColor; speed_max_2.textFill = nightTextColor; speed_display_2.textFill = nightTextColor
+			angle_label_2.textFill = nightTextColor; angle_min_2.textFill = nightTextColor; angle_max_2.textFill = nightTextColor; angle_display_2.textFill = nightTextColor
+			distance_label_2.textFill = nightTextColor; distance_min_2.textFill = nightTextColor;	distance_max_2.textFill = nightTextColor; distance_display_2.textFill = nightTextColor
+
+			group_label_3.textFill = nightTextColor
+			mass_label_3.textFill = nightTextColor; mass_min_3.textFill = nightTextColor;	mass_max_3.textFill = nightTextColor; mass_display_3.textFill = nightTextColor
+			speed_label_3.textFill = nightTextColor; speed_min_3.textFill = nightTextColor; speed_max_3.textFill = nightTextColor; speed_display_3.textFill = nightTextColor
+			angle_label_3.textFill = nightTextColor; angle_min_3.textFill = nightTextColor; angle_max_3.textFill = nightTextColor; angle_display_3.textFill = nightTextColor
+			distance_label_3.textFill = nightTextColor; distance_min_3.textFill = nightTextColor; distance_max_3.textFill = nightTextColor; distance_display_3.textFill = nightTextColor
+
+			group_label_4.textFill = nightTextColor
+			mass_label_4.textFill = nightTextColor; mass_min_4.textFill = nightTextColor; mass_max_4.textFill = nightTextColor; mass_display_4.textFill = nightTextColor
+			speed_label_4.textFill = nightTextColor; speed_min_4.textFill = nightTextColor; speed_max_4.textFill = nightTextColor; speed_display_4.textFill = nightTextColor
+			angle_label_4.textFill = nightTextColor; angle_min_4.textFill = nightTextColor; angle_max_4.textFill = nightTextColor; angle_display_4.textFill = nightTextColor
+			distance_label_4.textFill = nightTextColor; distance_min_4.textFill = nightTextColor; distance_max_4.textFill = nightTextColor; distance_display_4.textFill = nightTextColor
+
+			group_label_5.textFill = nightTextColor
+			mass_label_5.textFill = nightTextColor; mass_min_5.textFill = nightTextColor; mass_max_5.textFill = nightTextColor; mass_display_5.textFill = nightTextColor
+			speed_label_5.textFill = nightTextColor; speed_min_5.textFill = nightTextColor; speed_max_5.textFill = nightTextColor; speed_display_5.textFill = nightTextColor
+			angle_label_5.textFill = nightTextColor; angle_min_5.textFill = nightTextColor; angle_max_5.textFill = nightTextColor; angle_display_5.textFill = nightTextColor
+			distance_label_5.textFill = nightTextColor; distance_min_5.textFill = nightTextColor; distance_max_5.textFill = nightTextColor; distance_display_5.textFill = nightTextColor
+
+			group_label_6.textFill = nightTextColor
+			mass_label_6.textFill = nightTextColor; mass_min_6.textFill = nightTextColor;	mass_max_6.textFill = nightTextColor; mass_display_6.textFill = nightTextColor
+			speed_label_6.textFill = nightTextColor; speed_min_6.textFill = nightTextColor; speed_max_6.textFill = nightTextColor; speed_display_6.textFill = nightTextColor
+			angle_label_6.textFill = nightTextColor; angle_min_6.textFill = nightTextColor; angle_max_6.textFill = nightTextColor; angle_display_6.textFill = nightTextColor
+			distance_label_6.textFill = nightTextColor; distance_min_6.textFill = nightTextColor;	distance_max_6.textFill = nightTextColor; distance_display_6.textFill = nightTextColor
+
+			group_label_7.textFill = nightTextColor
+			mass_label_7.textFill = nightTextColor; mass_min_7.textFill = nightTextColor;	mass_max_7.textFill = nightTextColor; mass_display_7.textFill = nightTextColor
+			speed_label_7.textFill = nightTextColor; speed_min_7.textFill = nightTextColor; speed_max_7.textFill = nightTextColor; speed_display_7.textFill = nightTextColor
+			angle_label_7.textFill = nightTextColor; angle_min_7.textFill = nightTextColor; angle_max_7.textFill = nightTextColor; angle_display_7.textFill = nightTextColor
+			distance_label_7.textFill = nightTextColor; distance_min_7.textFill = nightTextColor;	distance_max_7.textFill = nightTextColor; distance_display_7.textFill = nightTextColor
+
+			group_label_8.textFill = nightTextColor
+			mass_label_8.textFill = nightTextColor; mass_min_8.textFill = nightTextColor;	mass_max_8.textFill = nightTextColor; mass_display_8.textFill = nightTextColor
+			speed_label_8.textFill = nightTextColor; speed_min_8.textFill = nightTextColor; speed_max_8.textFill = nightTextColor; speed_display_8.textFill = nightTextColor
+			angle_label_8.textFill = nightTextColor; angle_min_8.textFill = nightTextColor; angle_max_8.textFill = nightTextColor; angle_display_8.textFill = nightTextColor
+			distance_label_8.textFill = nightTextColor; distance_min_8.textFill = nightTextColor; distance_max_8.textFill = nightTextColor; distance_display_8.textFill = nightTextColor
+
+			if(this.selectedMap != 1) {
+				preview_map_1_border.stroke = nightTextColor
+				map_label_1.textFill = nightTextColor
+			} else if (this.selectedMap == 1) {
+				preview_map_1_border.stroke = rgb(235, 221, 26)
+				map_label_1.textFill = rgb(235, 221, 26)
+			}
+			
+			if (this.selectedMap != 2) {
+				preview_map_2_border.stroke = nightTextColor
+				map_label_2.textFill = nightTextColor
+			} else if (this.selectedMap == 2) {
+				preview_map_2_border.stroke = rgb(235, 221, 26)
+				map_label_2.textFill = rgb(235, 221, 26)
+			}
+
+			if (this.selectedMap != 3) {
+				preview_map_3_border.stroke = nightTextColor
+				map_label_3.textFill = nightTextColor
+			} else if (this.selectedMap == 3) {
+				preview_map_3_border.stroke = rgb(235, 221, 26)
+				map_label_3.textFill = rgb(235, 221, 26)
+			}
+
+			if (this.selectedMap != 4) {
+				preview_map_4_border.stroke = nightTextColor
+				map_label_4.textFill = nightTextColor
+			} else if (this.selectedMap == 3) {
+				preview_map_4_border.stroke = rgb(235, 221, 26)
+				map_label_4.textFill = rgb(235, 221, 26)
+			}
+		}
+	}
+}

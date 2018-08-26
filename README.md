@@ -1,28 +1,29 @@
-Simulation de Boids en SARL
+# Boids Demonstration
 
-Ce dépôt contient l'ensemble des sources relatives au projet Simulation de Boids en SARL pour l'UV IA54.
-Le lancement de l'application se fait de préférence dans l'IDE eclipse-sarl.
 
-# Lancement de l'application
+Boids is an artificial life program, developed by Craig Reynolds in 1986, which simulates the flocking behaviour of birds. The name "boid" corresponds to a shortened version of "bird-oid object", which refers to a bird-like object.
 
-## Importation du projet dans eclipse-sarl
 
-Le projet doit tout d'abord être importé dans l'IDE. L'option **Open Projects from File System...** est recommandée pour cette opération.
+As with most artificial life simulations, Boids is an example of emergent behavior; that is, the complexity of Boids arises from the interaction of individual agents (the boids, in this case) adhering to a set of simple rules. The rules applied in the simplest Boids world are as follows:
 
-![execution from ide 1](https://user-images.githubusercontent.com/26325774/34651676-508ea71e-f3d3-11e7-8ba4-8d3cee8e67f9.png)
+* separation: steer to avoid crowding local flockmates;
+* alignment: steer towards the average heading of local flockmates;
+* cohesion: steer to move toward the average position (center of mass) of local flockmates.
 
-Il s'agit ensuite de retrouver le dossier du projet _dézippé_ dans son gestionnaire de fichiers en cliquant sur **Directory**.
 
-![execution from ide 2](https://user-images.githubusercontent.com/26325774/34651687-7377738c-f3d3-11e7-8e0f-556ea90691ce.png)
+More complex rules can be added, such as obstacle avoidance and goal seeking.
 
-Par défaut, le projet est nommé **IA54-Boids**.
 
-![execution from ide 3](https://user-images.githubusercontent.com/26325774/34651704-a09b82d6-f3d3-11e7-994e-38b5c4cf640c.png)
+The basic model has been extended in several different ways since Reynolds proposed it. For instance, Delgado-Mata et al. extended the basic model to incorporate the effects of fear. Olfaction was used to transmit emotion between animals, through pheromones modelled as particles in a free expansion gas. Hartman and Benes introduced a complementary force to the alignment that they call the change of leadership. This steer defines the chance of the boid to become a leader and try to escape.
 
-Le projet est alors techniquement prêt à être lancé. S'agissant d'un projet Maven, une mise à jour des dépendances est peut-être nécessaire. Pour ce faire, il suffit de sélectionner **Update Project...** dans le menu contextuel.
 
-![execution from ide 4](https://user-images.githubusercontent.com/26325774/34651709-c54dd476-f3d3-11e7-9dc0-1f3712d49053.png)
+The movement of Boids can be characterized as either chaotic (splitting groups and wild behaviour) or orderly. Unexpected behaviours, such as splitting flocks and reuniting after avoiding obstacles, can be considered emergent.
 
-Enfin, le lancement de l'application se fait également via le menu contextuel, sur l'agent **Boids** (fichier **boids.sarl**) avec l'option **Run As** > **SARL Agent**. Aucune configuration supplémentaire n'est nécessaire.
 
-![execution from ide 5](https://user-images.githubusercontent.com/26325774/34651714-e5b86852-f3d3-11e7-8d84-764b967df442.png)
+The boids framework is often used in computer graphics, providing realistic-looking representations of flocks of birds and other creatures, such as schools of fish or herds of animals. It was for instance used in the 1998 video game Half-Life for the flying bird-like creatures seen at the end of the game on Xen, named "boid" in the game files.
+
+
+The Boids model can be used for direct control and stabilization of teams of simple Unmanned Ground Vehicles (UGV) or Micro Aerial Vehicles (MAV) in swarm robotics. For stabilization of heterogeneous UAV-UGV teams, the model was adapted for using onboard relative localization by Saska et al.
+
+
+![Application with the GUI](boids_screenshot.png)

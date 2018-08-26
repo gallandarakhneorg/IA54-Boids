@@ -1,0 +1,347 @@
+/* 
+ * $Id$
+ * 
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ * 
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.sarl.demos.boids.agents
+
+import io.sarl.core.DefaultContextInteractions
+import io.sarl.core.Initialize
+import io.sarl.core.Lifecycle
+import io.sarl.core.Logging
+import io.sarl.demos.boids.body.BoidBody
+import io.sarl.demos.boids.body.EnvInfos
+import io.sarl.demos.boids.environment.Obstacle
+import io.sarl.demos.boids.events.BoidInitialized
+import io.sarl.demos.boids.events.EndSimulation
+import io.sarl.demos.boids.events.MotionDecision
+import io.sarl.demos.boids.events.MotionQuery
+import io.sarl.demos.boids.events.StartPositionQuery
+import io.sarl.demos.boids.events.ValidationDeplacement
+import java.util.List
+import java.util.Map
+import java.util.Random
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import org.arakhne.afc.math.geometry.d2.d.Circle2d
+import org.arakhne.afc.math.geometry.d2.d.Point2d
+import org.arakhne.afc.math.geometry.d2.d.Vector2d
+
+/** 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author "Zilliq11"
+ * @author Stephane Galland
+ */
+@SuppressWarnings("discouraged_occurrence_readonly_use", "potential_field_synchronization_problem")
+agent Boid {
+	uses Logging, DefaultContextInteractions, Lifecycle
+
+	/** The body of the boid.
+	 */
+	var body : BoidBody
+
+	/** Identifier of the environment.
+	 */
+	var parentAgent : UUID
+
+	/** Environment data that should be known by the boid.
+	 */
+	var envInfos : EnvInfos
+
+	on Initialize {
+		loggingName = "Boid-" + this.ID
+		this.parentAgent = occurrence.spawner
+		this.body = new BoidBody(
+			this.ID,
+			occurrence.parameters.get(0) as Integer,
+			occurrence.parameters.get(1) as Integer,
+			occurrence.parameters.get(2) as Integer,
+			occurrence.parameters.get(3) as Integer,
+			occurrence.parameters.get(4) as Integer
+		)
+		this.envInfos = occurrence.parameters.get(5) as EnvInfos
+		emit(new BoidInitialized(this.body, 'Boid'))
+	}
+
+	on StartPositionQuery {
+		var validPosition : AtomicBoolean = new AtomicBoolean(true)
+		var maPosition : Point2d
+		var rnd = new Random
+		var x : AtomicInteger = new AtomicInteger(0)
+		var y : AtomicInteger = new AtomicInteger(0)
+		var vx : AtomicInteger = new AtomicInteger(0)
+		var vy : AtomicInteger = new AtomicInteger(0)
+		do {
+			validPosition.set(true)
+			x.set(rnd.nextInt(envInfos.width) + 1)
+			y.set(rnd.nextInt(envInfos.height) + 1)
+			occurrence.obstacles.forEach [ o, index |
+				if (o.edges.contains(x.get(), y.get())) {
+					validPosition.set(false)
+				}
+			]
+		} while (validPosition.get == false)
+
+		maPosition = new Point2d(x.get, y.get)
+
+		// définition d'une vitesse aléatoire
+		vx.set(rnd.nextInt(this.body.maxSpeed))
+		vy.set(rnd.nextInt(this.body.maxSpeed))
+		var influence = new Vector2d(vx.get, vy.get)
+
+		// vmax est en ligne droite, on vérifie qu'avec vx et vy on dépasse pas la longueur de vmax
+		if (influence.length > this.body.maxSpeed) {
+			influence.length = this.body.maxSpeed
+		}
+
+		this.body.speedInfluence = influence
+
+		emit(new MotionDecision(maPosition, influence))
+	}
+
+	on MotionQuery {
+
+		var boids = occurrence.boids
+		var forceTot : Vector2d
+
+		forceTot = new Vector2d(0, 0)
+
+		var visibleBoids : Map<UUID, BoidBody>
+		var closeBoids : Map<UUID, BoidBody>
+
+		closeBoids = perception(boids, PerceptionMode::CLOSE)
+		visibleBoids = perception(closeBoids, PerceptionMode::VISIBLE)
+
+		if (boids !== null) {
+			// separation is applied
+			forceTot += closeBoids.separation
+
+			// cohesion is applied
+			forceTot += visibleBoids.cohesion
+
+			// alignment is applied
+			forceTot += visibleBoids.alignment
+
+			// repulsion is applied
+			forceTot += visibleBoids.repulsion
+
+			// obstacle repulsion is applied
+			forceTot += occurrence.obstacles.computerObstacleForce
+
+		}
+
+		forceTot.scale(100000)
+
+		emit(new MotionDecision(forceTot.applyForce, this.body.speedInfluence))
+	}
+
+	on ValidationDeplacement {
+		this.body.position = occurrence.position
+		this.body.speed = this.body.speedInfluence
+	}
+
+	on EndSimulation [isFrom(this.parentAgent)] {
+		emit(new EndSimulation)[it.UUID == this.parentAgent]
+		killMe
+	}
+
+	def visible(b : BoidBody) : boolean {
+		var tmp = b.position - this.body.position
+		var tmp2 = this.body.speed
+
+		// If one of the vectors is nul, computation cannot be done without error.
+		if (tmp2.length == 0 || tmp.length == 0) {
+			return false
+		}
+
+		// test if the boid is inside or outside the perception angle: cos(ABC) = vec(AB).vec(AC)/(AB*AC)
+		if (Math.toDegrees(Math.acos(((tmp2 * tmp) / (tmp2.length * tmp.length)))) > this.body.perceptionAngle) {
+			return false
+		} else {
+			return true
+		}
+	}
+
+	def near(b : BoidBody) : boolean {
+		var tmp = b.position - this.body.position
+		if (tmp.length > this.body.perceptionDistance) {
+			return false
+		}
+		return true
+	}
+
+	def separation(boids : Map<UUID, BoidBody>) : Vector2d {
+		var force = new Vector2d(0, 0)
+		var tmp = new Vector2d(0, 0)
+		var len : double
+
+		for (elem : boids.entrySet) {
+			if (elem.key !== null && elem.value.group == this.body.group) {
+				tmp = this.body.position - elem.value.position
+				len = tmp.length
+				tmp.scale(1 / (len * len))
+				force += tmp
+				force.scale(35)
+			}
+		}
+
+		return force
+
+	}
+
+	def cohesion(boids : Map<UUID, BoidBody>) : Vector2d {
+		var nbTot = 0
+		var force = new Vector2d(0, 0)
+
+		for (elem : boids.entrySet) {
+			if (elem.key !== null && elem.value.group == this.body.group) {
+				nbTot++
+				var pos = elem.value.position
+				force.add(pos.x, pos.y)
+			}
+		}
+
+		if (nbTot > 0) {
+			force.scale(1 / nbTot)
+			var pos = this.body.position
+			force.sub(pos.x, pos.y) 
+		}
+		force.scale(25)
+		return force
+	}
+
+	def alignment(boids : Map<UUID, BoidBody>) : Vector2d {
+		var nbTot = 0
+		var force = new Vector2d(0, 0)
+		var tmp = new Vector2d(0, 0)
+
+		for (elem : boids.entrySet) {
+			if (elem.key !== null && elem.value.group == this.body.group) {
+				nbTot++
+				tmp.set(elem.value.position)
+				tmp.scale(1 / tmp.length)
+				force += tmp
+			}
+		}
+
+		if (nbTot > 0) {
+			force.scale(1 / nbTot)
+		}
+		force.scale(50)
+		return force
+
+	}
+
+	def repulsion(boids : Map<UUID, BoidBody>) : Vector2d {
+		var force = new Vector2d(0, 0)
+		var tmp = new Vector2d(0, 0)
+		var len : double
+
+		for (elem : boids.entrySet) {
+			if (elem.key !== null && elem.value.group != this.body.group) {
+				tmp = this.body.position - elem.value.position
+				len = tmp.length
+				tmp.scale(1 / (len * len))
+				force += tmp
+				force.scale(100)
+			}
+		}
+
+		return force
+	}
+
+	def computerObstacleForce(obstacles : List<Obstacle>) : Vector2d {
+		var force = new Vector2d(0, 0)
+
+		if (!obstacles.isNullOrEmpty) {
+			var sphereBoid = new Circle2d(new Point2d(this.body.position), this.body.perceptionDistance)
+
+			for (o : obstacles) {
+				var distanceMin = Double::MAX_VALUE
+
+				var edges = o.edges
+
+				if (edges.intersects(sphereBoid)) {
+					var closePoint = edges.getClosestPointTo(this.body.position)
+					var forceAdd = this.body.position - closePoint
+					forceAdd.scale(10000000 / distanceMin)
+					force += forceAdd
+				}
+			}
+
+		}
+
+		return force
+
+	}
+
+	def applyForce(force : Vector2d) : Point2d {
+		// f = ma => a = f/m
+		var acceleration : Vector2d
+
+		if (force.length > 10) {
+			force.length = 10
+		}
+
+		acceleration = force * (1 / this.body.mass.doubleValue)
+
+		var influence = this.body.speed + acceleration
+
+		// bornage de la vitesse
+		if (influence.length > this.body.maxSpeed) {
+			influence.length = this.body.maxSpeed
+		}
+
+		this.body.speedInfluence = influence
+
+		// maj position
+		return this.body.position + influence
+	}
+
+	/** Determine the list of boids within the perception field (CLOSE), or within the vision field (visible).
+	 * @param boids the list of boids to consider. 
+	 * @param mode The percpetion mode: {@link PerceptionMode::VISIBLE} for visible boids, {@link PerceptionMode::CLOSE}
+	 *     for close boids.
+	 * @return The perceived boids.
+	 */
+	def perception(boids : Map<UUID, BoidBody>, mode : PerceptionMode) : Map<UUID, BoidBody> {
+		switch (mode) {
+		case VISIBLE: {
+				var visibleBoids = <UUID, BoidBody>newHashMap
+				for (elem : boids.entrySet) {
+					if (elem.key !== null && elem.value.visible && elem.key != this.ID) {
+						visibleBoids.put(elem.key, elem.value)
+					}
+				}
+				return visibleBoids
+			}
+		case CLOSE: {
+				var closeBoids = <UUID, BoidBody>newHashMap
+				for (elem : boids.entrySet) {
+					if (elem.key !== null && elem.value.near && elem.key != this.ID) {
+						closeBoids.put(elem.key, elem.value)
+					}
+				}
+				return closeBoids
+			}
+		}
+	}
+
+}

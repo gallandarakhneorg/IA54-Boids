@@ -1,0 +1,71 @@
+/*
+ * $Id$
+ *
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ *
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.sarl.demos.boids
+
+import static extension javafx.scene.paint.Color.*
+
+/**
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+final class Configuration {
+
+	/** Refresh frequency of the simulation.
+	 */
+	public static val FREQUENCY = 50l
+
+	/** Color for the boids' families.
+	 */
+	public static val COLOR_FAMILY = #{
+		1 -> rgb(0, 174, 255),
+		2 -> rgb(255, 66, 66),
+		3 -> rgb(0, 217, 112),
+		4 -> rgb(211, 66, 255),
+		5 -> rgb(255, 149, 20),
+		6 -> rgb(252, 61, 240),
+		7 -> rgb(176, 155, 111),
+		8 -> rgb(74, 243, 255),
+		9 -> rgb(41, 204, 182),
+		10 -> rgb(54, 74, 255)
+	}
+
+	/** The default mass of a boids.
+	 */
+	public static val DEFAULT_MASS = 2
+	
+	/** The default maximal speed for a boids.
+	 */
+	public static val DEFAULT_SPEED = 10
+	
+	/** The default perception angle of the boids.
+	 */
+	public static val DEFAULT_ANGLE = 30
+	
+	/** The default perception distance of the boids.
+	 */
+	public static val DEFAULT_DISTANCE = 20
+
+	private new {}
+
+}

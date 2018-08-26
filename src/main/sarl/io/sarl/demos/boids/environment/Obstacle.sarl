@@ -1,0 +1,166 @@
+/* 
+ * $Id$
+ * 
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ * 
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.sarl.demos.boids.environment
+
+import javafx.scene.shape.Polygon
+import org.arakhne.afc.math.geometry.d2.d.Path2d
+import org.arakhne.afc.math.geometry.d2.d.Point2d
+
+/** 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+class Obstacle {
+
+	/** The polygon of the obstacle.
+	 */
+	var shape : Polygon
+
+	/** The list of the edges of the polygon.
+	 */
+	var edges : Path2d
+
+	/** The center of the polygon
+	 */
+	var center : Point2d
+
+	
+	/** 
+	 * Constructor.
+	 * 
+	 * @param obstacle the obstacle to copy.
+	 */
+	new (obstacle : Obstacle) {
+		assert obstacle !== null
+		this.shape = obstacle.shape
+	}
+
+	/** 
+	 * Constructor.
+	 * 
+	 * @param shape the shape to associate to the obstacle.
+	 */
+	new (shape : Polygon) {
+		this.shape = shape
+	}
+
+	private def ensureEdges : Path2d {
+		if (this.edges === null) {
+			edges = new Path2d
+			val nbPoints = getNbPoints
+			for (var i = 0; i < nbPoints; i = i + 2) {
+				if (i == 0) {
+					edges.moveTo(this.shape.points.get(i), this.shape.points.get(i + 1))
+				} else {
+					edges.lineTo(this.shape.points.get(i), this.shape.points.get(i + 1))
+				}
+			}
+		}
+		this.edges
+	}
+
+	/** 
+	 * @return The polygon associated to the obstacle.
+	 */
+	def getPolygon_ : Polygon {
+		this.shape
+	}
+
+	/** 
+	 * @return The list of the edges of the polygon.
+	 */
+	def getEdges : Path2d {
+		ensureEdges
+	}
+
+	/** 
+	 * @param polygon the new polygon.
+	 */
+	def setPolygon_(polygon : Polygon) {
+		assert polygon !== null
+		this.shape = polygon
+		this.edges = null
+		this.center = null
+	}
+
+	/** 
+	 * @return The number of points in the polygon.
+	 */
+	def getNbPoints : int {
+		this.polygon_.points.size
+	}
+
+	/** Replies the center point of the polygon.
+	 * @return the center point of the polygon.
+	 */
+	def getCenter : Point2d {
+		if (this.center === null) {
+			var centerX = 0.0
+			var centerY = 0.0
+			val pts = polygon_.points
+			val nbp = pts.size
+			val endIndex = nbp - 1
+			for (var i = 0; i < endIndex; i = i + 2) {
+				centerX += pts.get(i)
+				centerY += pts.get(i + 1)
+			}
+			centerX = centerX / (nbp / 2.0)
+			centerY = centerY / (nbp / 2.0)
+
+			this.center = new Point2d(centerX, centerY)
+		}
+		return this.center
+	}
+
+	/** Create a scaled copy of the current polygon.
+	 * @param factor expanding factor. {@code 1} for creating an exact copy of the polygon.
+	 *     Lower than {@code 1} for creating a smaller polygon. Higher than {@code 1} for
+	 *     creating a bigger polygon. 
+	 * @return The new polygon.
+	 */
+	def createScaledPolygon(factor : double) : Polygon {
+		val pts = polygon_.points
+		val nbp = pts.size
+		val endIndex = nbp - 1
+		var centerX : double
+		var centerY : double
+
+		for (var i = 0; i < endIndex; i = i + 2) {
+			centerX += pts.get(i)
+			centerY += pts.get(i + 1)
+		}
+
+		centerX /= nbp
+		centerY /= nbp
+
+		val fullList = newArrayList
+
+		for (var i = 0; i < nbPoints - 1; i = i + 2) {
+			fullList += (pts.get(i) - centerX) * factor + centerX
+			fullList += (pts.get(i + 1) - centerY) * factor + centerY
+		}
+
+		return new Polygon(fullList)
+	}
+
+}

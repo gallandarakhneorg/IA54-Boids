@@ -1,0 +1,121 @@
+/* 
+ * $Id$
+ * 
+ * SARL is an general-purpose agent programming language.
+ * More details on http://www.sarl.io
+ * 
+ * Copyright (C) 2014-@RELEASE_YEAR@ the original authors or authors.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.sarl.demos.boids.body
+
+import java.util.UUID
+import org.arakhne.afc.math.geometry.d2.d.Vector2d
+import org.eclipse.xtend.lib.annotations.Accessors
+
+/** 
+ * @author Mickael Constanzer
+ * @author Jean-Eudes Patois
+ * @author Zilliq11
+ * @author Stephane Galland
+ */
+class BoidBody extends EnvObjet {
+
+	/** UUID of the agent that owns this body.
+	 */
+	@Accessors
+	var id : UUID
+
+	/** Boids' speed.
+	 */
+	@Accessors
+	val speed = new Vector2d
+
+	/** Speed of the boids after the motion is accepted by the environment.
+	 */
+	@Accessors(PUBLIC_GETTER)
+	val speedInfluence = new Vector2d
+
+	/** Group of the boid.
+	 */
+	@Accessors
+	var group : int
+
+	/** Max speed of the boid.
+	 */
+	@Accessors
+	var maxSpeed : int
+
+	/** Mass of the boid.
+	 */
+	@Accessors
+	var mass : int
+
+	/** Perception angle of the boid.
+	 */
+	@Accessors
+	var perceptionAngle : int
+
+	/** Perception distance of the boid.
+	 */
+	@Accessors
+	var perceptionDistance : int
+
+	/** 
+	 * @param id the identifier of the agent that owns this body.
+	 * @param groupe - Le groupe auquel appartient le boids
+	 * @param groupeVitesseMax - La vitesse max que pourra avoir le boids
+	 * @param masse - La masse du boids
+	 * @param angleVisibilite - L'angle de vision que le boids aura
+	 * @param distanceVisibilite - La distance de vision et de perception dont disposera le boids
+	 */
+	new (id : UUID, groupe : int, groupeVitesseMax : int, masse : int, angleVisibilite : int,
+		distanceVisibilite : int) {
+		this.id = id
+		this.group = groupe
+		this.maxSpeed = groupeVitesseMax
+		this.mass = masse
+		this.perceptionAngle = angleVisibilite
+		this.perceptionDistance = distanceVisibilite
+	}
+
+	/** 
+	 * Création d'une instance Boidbody par copie
+	 * @param body - La corps à copier
+	 */
+	new (body : BoidBody) {
+		this.group = body.group
+		this.maxSpeed = body.maxSpeed
+		this.mass = body.mass
+		this.perceptionAngle = body.perceptionAngle
+		this.perceptionDistance = body.perceptionDistance
+	}
+
+	/** 
+	 * @param newV the speed to apply to the body.
+	 */
+	def setSpeedInfluence(newV : Vector2d) {
+		assert newV !== null
+		this.speedInfluence.set(newV)
+	}
+
+	/** 
+	 * @param newV the speed of the body.
+	 */
+	def setSpeed(newV : Vector2d) {
+		assert newV !== null
+		this.speed.set(newV)
+	}
+
+}
